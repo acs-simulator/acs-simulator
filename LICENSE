@@ -1,0 +1,57 @@
+ACS Simulator — Simulatore di controllo del traffico aereo
+Copyright © 2026 ACS Simulator. Tutti i diritti riservati.
+
+
+LICENZA D'USO (italiano)
+
+1. Concessione. L'autore concede a chiunque il diritto gratuito di scaricare,
+   installare ed eseguire ACS Simulator su un numero qualsiasi di dispositivi
+   personali, per uso personale, didattico o ricreativo, e di parlarne,
+   mostrarlo, trasmetterlo in diretta o registrarne video.
+
+2. Limiti. Senza autorizzazione scritta dell'autore non è consentito:
+   a) ridistribuire il programma o parti di esso, in qualunque forma, compresa
+      la pubblicazione su altri siti, archivi o negozi di applicazioni;
+   b) venderlo, noleggiarlo o includerlo in prodotti o servizi a pagamento;
+   c) modificarlo, decompilarlo, disassemblarlo o derivarne opere;
+   d) usarlo per addestramento professionale o per qualsiasi attività
+      operativa connessa alla navigazione aerea o al controllo del traffico.
+
+3. Dati di terzi. I dati aeronautici inclusi restano dei rispettivi titolari e
+   sono soggetti alle loro condizioni: vedi CREDITI.md. La presente licenza
+   riguarda il programma, non quei dati.
+
+4. Nessuna garanzia. Il programma è fornito "così com'è", senza garanzie di
+   alcun tipo. L'autore non risponde di alcun danno derivante dal suo uso.
+
+5. Nessun valore operativo. ACS Simulator è una simulazione a scopo didattico e
+   ricreativo. Non riproduce le procedure in vigore, non è aggiornato ai cicli
+   AIRAC correnti e non può essere usato per la navigazione aerea reale. Non è
+   prodotto, approvato né sostenuto da ENAV S.p.A., da IVAO o da VATSIM.
+
+
+LICENSE (English, courtesy translation — the Italian text prevails)
+
+1. Grant. The author grants everyone the free right to download, install and
+   run ACS Simulator on any number of personal devices for personal, educational
+   or recreational use, and to discuss, show, stream or record it.
+
+2. Restrictions. Without the author's written permission you may not:
+   a) redistribute the program or any part of it, in any form, including
+      publishing it on other websites, archives or application stores;
+   b) sell, rent or bundle it into paid products or services;
+   c) modify, decompile, disassemble or create derivative works from it;
+   d) use it for professional training or any operational activity related to
+      air navigation or air traffic control.
+
+3. Third-party data. The aeronautical data included remains the property of
+   its respective owners and is subject to their terms: see CREDITI.md. This
+   license covers the program, not that data.
+
+4. No warranty. The program is provided "as is", without warranty of any kind.
+   The author is not liable for any damage arising from its use.
+
+5. Not for operational use. ACS Simulator is an educational and recreational
+   simulation. It does not reproduce current procedures, is not aligned with
+   current AIRAC cycles, and must not be used for real air navigation. It is
+   not produced, endorsed or supported by ENAV S.p.A., IVAO or VATSIM.

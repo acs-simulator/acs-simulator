@@ -1,0 +1,28 @@
+# dipendenze e build
+node_modules/
+dist/
+out/
+*.log
+
+# materiale sorgente non ridistribuibile (vedi CREDITI.md):
+# la carta FRA dell'AIP Italia da cui tools/ estrae renderer/data/chart.js
+*.pdf
+
+# lanciatore locale di macOS (sostituito dai pacchetti in dist/)
+Simulatore ATC.app/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# editor
+.vscode/
+.idea/
+*.swp
+
+# cache degli strumenti e file di lavoro degli assistenti
+.impeccable/
+.claude/
+tools/procedures/.cache/
