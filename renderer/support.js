@@ -5,7 +5,7 @@
 // ---------------------------------------------------------------------------
 // Nome utente di Buy Me a Coffee: la parte finale dell'indirizzo della pagina, cioè la
 // "acssimulator" di https://www.buymeacoffee.com/acssimulator.
-// La pagina va registrata con questo stesso nome. Se lo cambi, cambia anche qui.
+// Se cambi il nome della pagina, cambia anche qui e in site/index.html.
 // Lasciandolo vuoto i pulsanti del sostegno scompaiono (e `npm test` lo segnala).
 export const BUYMEACOFFEE_USER = 'acssimulator';
 // ---------------------------------------------------------------------------

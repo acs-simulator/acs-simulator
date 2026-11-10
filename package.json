@@ -18,11 +18,11 @@
   "scripts": {
     "start": "electron .",
     "test": "node tools/check.mjs",
-    "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux",
-    "pack": "electron-builder --dir",
+    "dist": "electron-builder --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:linux": "electron-builder --linux --publish never",
+    "pack": "electron-builder --dir --publish never",
     "site": "node tools/build-site.mjs"
   },
   "devDependencies": {
@@ -86,7 +86,9 @@
         "AppImage",
         "deb"
       ],
-      "artifactName": "${productName}-${version}.${ext}"
+      "artifactName": "${productName}-${version}.${ext}",
+      "maintainer": "ACS Simulator <acs-simulator@users.noreply.github.com>",
+      "vendor": "ACS Simulator"
     }
   }
 }
