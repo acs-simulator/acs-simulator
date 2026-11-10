@@ -1,0 +1,83 @@
+{
+  "name": "acs-simulator",
+  "productName": "ACS Simulator",
+  "version": "1.0.0",
+  "description": "Simulatore di controllo del traffico aereo d'area: i settori reali di Roma ACC e Milano ACC, con traffico, meteo, zone riservate ed emergenze.",
+  "author": "ACS Simulator",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/acs-simulator/acs-simulator",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/acs-simulator/acs-simulator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/acs-simulator/acs-simulator/issues"
+  },
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node tools/check.mjs",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "pack": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "allowScripts": {
+    "electron@32.3.3": true
+  },
+  "build": {
+    "appId": "com.acssimulator.app",
+    "productName": "ACS Simulator",
+    "copyright": "Copyright © 2026 ACS Simulator",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "LICENSE",
+      "CREDITI.md"
+    ],
+    "mac": {
+      "category": "public.app-category.simulation-games",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "${productName} ${version}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "${productName}-${version}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "ACS Simulator"
+    },
+    "linux": {
+      "category": "Game",
+      "target": ["AppImage", "deb"],
+      "artifactName": "${productName}-${version}.${ext}"
+    }
+  }
+}

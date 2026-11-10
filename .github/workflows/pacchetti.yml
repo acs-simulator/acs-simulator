@@ -1,0 +1,93 @@
+# Costruisce i pacchetti per macOS, Windows e Linux e li allega a una release.
+#
+# Si avvia pubblicando un tag di versione:
+#   git tag -a v1.0.0 -m "ACS Simulator 1.0.0" && git push origin v1.0.0
+# oppure a mano dalla scheda Actions del repository.
+#
+# I pacchetti non sono firmati: vedi la sezione "Al primo avvio" del README.
+name: Pacchetti
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  controlli:
+    name: Controlli
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+        env:
+          RELEASE: '1'
+
+  pacchetti:
+    name: ${{ matrix.nome }}
+    needs: controlli
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            nome: macOS
+            comando: npm run dist:mac
+          - os: windows-latest
+            nome: Windows
+            comando: npm run dist:win
+          - os: ubuntu-latest
+            nome: Linux
+            comando: npm run dist:linux
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Costruisci
+        run: ${{ matrix.comando }}
+        env:
+          # nessuna firma: electron-builder non deve cercare certificati
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: acs-simulator-${{ matrix.nome }}
+          path: |
+            dist/*.dmg
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb
+          if-no-files-found: error
+
+  release:
+    name: Pubblica la release
+    needs: pacchetti
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: pacchetti
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: pacchetti/*
+          draft: true
+          name: ACS Simulator ${{ github.ref_name }}
+          body: |
+            Pacchetti per macOS (Apple Silicon e Intel), Windows e Linux.
+
+            Al primo avvio i sistemi avvisano che l'autore non è verificato
+            perché l'applicazione non è firmata: su macOS apri con
+            **clic destro → Apri**, su Windows scegli **Ulteriori informazioni
+            → Esegui comunque**. Le istruzioni complete sono nel README.

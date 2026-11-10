@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<title>Simulatore ACC</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="radar-pane">
+      <canvas id="radar"></canvas>
+      <div id="radar-overlays">
+        <div id="radio-msgs" aria-live="polite" aria-label="Messaggi dei piloti"></div>
+        <div id="toasts"></div>
+      </div>
+
+      <!-- modalità guidata: il riquadro dell'istruttore, passo per passo -->
+      <section id="coach" class="hidden" aria-live="polite">
+        <header class="coach-head">
+          <div class="coach-where">
+            <span id="coach-lesson">-</span>
+            <span id="coach-step" class="muted">-</span>
+          </div>
+          <div class="coach-head-btns">
+            <button id="coach-sound" title="Suoni del tutorial" aria-pressed="true">♪</button>
+            <button id="coach-min" title="Riduci il riquadro (T)">–</button>
+            <button id="coach-quit" title="Esci dal tutorial">✕</button>
+          </div>
+        </header>
+        <div id="coach-dots" class="coach-dots"></div>
+        <div class="coach-body">
+          <h3 id="coach-title">-</h3>
+          <div id="coach-text"></div>
+          <div id="coach-goal" class="hidden"><span class="goal-mark"></span><span id="coach-goal-text"></span></div>
+          <div id="coach-hint" class="hidden"></div>
+          <ul id="coach-tasks" class="hidden"></ul>
+        </div>
+        <footer class="coach-foot">
+          <button id="coach-hint-btn">Suggerimento</button>
+          <button id="coach-skip">Salta</button>
+          <button id="coach-next" class="primary">Avanti ▸</button>
+        </footer>
+      </section>
+      <div id="coach-warp" class="hidden">⏩ avanti veloce…</div>
+      <div id="radar-tools" role="toolbar" aria-label="Strumenti del radar">
+        <button id="tool-cpa" aria-pressed="false" title="CPA (C): clic su due aerei. Distanza minima, minuti, separazione verticale">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 4 L9 9 M18 4 L11 9 M2 16 L9 11 M18 16 L11 11" /><circle cx="10" cy="10" r="1.6" /></svg>
+          CPA
+        </button>
+        <button id="tool-rb" aria-pressed="false" title="R&amp;B (R): clic su inizio e fine. Rilevamento nei due versi e distanza">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="16" r="1.8" /><circle cx="16" cy="4" r="1.8" /><path d="M5.5 14.5 L14.5 5.5" /></svg>
+          R&amp;B
+        </button>
+        <label class="tool-vector" title="Vettore velocità (min)">
+          <span>Vettore</span>
+          <input type="range" id="vector-range" min="1" max="10" step="1" value="2" />
+          <output id="vector-value">2 min</output>
+        </label>
+        <div class="tool-zoom" role="group" aria-label="Zoom">
+          <button id="zoom-out" title="Rimpicciolisci">−</button>
+          <input type="range" id="zoom-range" min="0" max="100" step="1" aria-label="Zoom" />
+          <button id="zoom-in" title="Ingrandisci">+</button>
+          <output id="zoom-value">100%</output>
+          <button id="view-reset" title="Centra sul settore">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="5" /><path d="M10 1.5 v4 M10 14.5 v4 M1.5 10 h4 M14.5 10 h4" /></svg>
+          </button>
+        </div>
+        <div class="tool-pop">
+          <button id="tag-btn" aria-expanded="false" aria-controls="tag-menu" title="Filtro tag per FL">
+            Tag <span id="tagfl-short">tutti</span> <span class="caret">▴</span>
+          </button>
+          <div id="tag-menu" class="tool-menu hidden">
+            <div class="map-menu-title" title="I voli di competenza, selezionati o in conflitto hanno sempre il tag">Filtro FL</div>
+            <output id="tagfl-value" class="range-value">tutti</output>
+            <div class="dual-range">
+              <div class="dual-track"><div class="dual-fill" id="tagfl-fill"></div></div>
+              <input type="range" id="tagfl-min" min="0" max="450" step="5" value="0" aria-label="Livello minimo delle etichette" />
+              <input type="range" id="tagfl-max" min="0" max="450" step="5" value="450" aria-label="Livello massimo delle etichette" />
+            </div>
+            <div class="menu-row">
+              <button id="tagfl-sector" title="Livelli del settore ±5 FL">Settore</button>
+              <button id="tagfl-all">Tutti</button>
+            </div>
+            <button id="tags-deconflict" title="Sistema i tag una volta, poi restano fermi">Deconflitta</button>
+          </div>
+        </div>
+        <div class="tool-pop tool-map">
+          <button id="map-btn" aria-expanded="false" aria-controls="map-menu">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 5 L7 3 L13 5 L18 3 V15 L13 17 L7 15 L2 17 Z M7 3 V15 M13 5 V17" /></svg>
+            Mappa <span class="caret">▴</span>
+          </button>
+          <div id="map-menu" class="tool-menu hidden">
+            <div class="map-menu-title">Punti FRA</div>
+            <div id="map-points">
+              <button data-points="all" class="active">Tutti</button>
+              <button data-points="cop">COP</button>
+              <button data-points="symbols">Solo simboli</button>
+            </div>
+            <div class="map-menu-title">Zone</div>
+            <button id="areas-inactive" class="map-check" aria-pressed="true">Zone non attive</button>
+            <div class="map-menu-title">Procedure (piste in uso)</div>
+            <button id="map-stars" class="map-check" aria-pressed="true">STAR</button>
+            <button id="map-sids" class="map-check" aria-pressed="false">SID</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside id="sidebar">
+      <div id="statusbar">
+        <div class="sector-head">
+          <div>
+            <div id="hud-sector">-</div>
+            <div id="hud-sector-sub" class="muted">-</div>
+          </div>
+          <div class="head-buttons">
+            <button id="support-btn" class="donate hidden" title="Offri un caffè a chi sviluppa ACS Simulator" aria-label="Sostieni il progetto">☕</button>
+            <button id="help-btn" title="Comandi del radar (H)" aria-label="Comandi del radar">?</button>
+            <button id="change-sector" title="Torna alla scelta del settore">Cambia</button>
+          </div>
+        </div>
+        <details class="menu" id="sim-menu">
+          <summary><span class="menu-title">Simulazione</span><span class="menu-info" id="sim-menu-info"></span></summary>
+          <div class="menu-body">
+            <div class="hud-grid">
+              <div class="hud-cell" id="hud-clock-cell"><span>Ora UTC</span><strong id="hud-clock">--:--</strong></div>
+              <div class="hud-cell"><span>In contatto</span><strong id="hud-assumed">0</strong></div>
+              <div class="hud-cell offered"><span>Da assumere</span><strong id="hud-offered">0</strong></div>
+              <div class="hud-cell"><span>Hand-off OK</span><strong id="hud-handoffs">0</strong></div>
+            </div>
+            <div class="row strikes-row">
+              <span>Errori di coordinamento</span>
+              <div id="hud-strikes" title="Al terzo errore la partita finisce"></div>
+            </div>
+            <div class="row">
+              <span>Velocità sim</span>
+              <div id="speed-buttons">
+                <button data-mult="1" class="active">1x</button>
+                <button data-mult="2">2x</button>
+                <button data-mult="4">4x</button>
+                <button data-mult="8">8x</button>
+              </div>
+            </div>
+            <div class="row two-buttons">
+              <button id="pause-btn">Pausa</button>
+              <button id="conflict-toggle">⚠ Conflitti 5 min</button>
+            </div>
+          </div>
+        </details>
+
+        <details class="menu" id="areas-menu" open>
+          <summary><span class="menu-title">Zone attive</span><span class="menu-info" id="areas-menu-info"></span></summary>
+          <div class="menu-body">
+            <div id="areas-list"></div>
+            <div class="hint">P, R, D, TSA, TRA vicine al settore · UTC</div>
+          </div>
+        </details>
+      </div>
+
+      <div id="label-panel" class="hidden">
+        <div id="label-header">
+          <div>
+            <div id="label-callsign">-</div>
+            <div id="label-spoken" class="muted">-</div>
+          </div>
+          <button id="label-close" title="Chiudi (Esc)">✕</button>
+        </div>
+
+        <div id="label-badges">
+          <span id="badge-control" class="badge">-</span>
+          <span id="badge-kind" class="badge">-</span>
+          <span id="badge-mode" class="badge">-</span>
+        </div>
+        <div id="label-plan" class="muted">-</div>
+
+        <div id="label-alerts" class="hidden"></div>
+
+        <section id="transfer-box">
+          <div class="transfer-row">
+            <div class="transfer-info">
+              <div class="muted">Uscita richiesta</div>
+              <div class="transfer-main"><strong id="xfer-level">-</strong> · <span id="xfer-fix">-</span></div>
+              <div class="muted">verso <span id="xfer-unit">-</span></div>
+            </div>
+            <button id="handon-btn" class="handon">HAND-ON</button>
+            <button id="handoff-btn" class="handoff">HAND-OFF</button>
+          </div>
+          <div id="xfer-check" class="hint">-</div>
+        </section>
+
+        <div id="label-last">-</div>
+        <div id="label-msg" class="hidden"></div>
+
+        <fieldset id="label-controls">
+          <section class="field-group">
+            <div class="section-title"><span>Prua</span><span class="unit">°</span></div>
+            <div class="hdg-top">
+              <div id="hdg-dial" title="Clicca o trascina per scegliere la prua"></div>
+              <div class="values">
+                <div class="value-row"><span>Attuale</span><strong id="hdg-current">-</strong></div>
+                <div class="value-row"><span id="hdg-target-label">Rotta</span><strong id="hdg-target">-</strong></div>
+              </div>
+            </div>
+            <div class="stepper">
+              <button data-step-for="heading" data-step="-10">−10</button>
+              <button data-step-for="heading" data-step="-5">−5</button>
+              <input id="in-heading" type="number" min="1" max="360" step="1" />
+              <button data-step-for="heading" data-step="5">+5</button>
+              <button data-step-for="heading" data-step="10">+10</button>
+            </div>
+            <div class="inline">
+              <button id="hdg-left">◄ Sinistra</button>
+              <button id="hdg-apply" class="primary">Vira</button>
+              <button id="hdg-right">Destra ►</button>
+            </div>
+            <div class="inline deviation">
+              <span>Devia</span>
+              <button data-turn="-20">◄ 20°</button>
+              <button data-turn="-10">◄ 10°</button>
+              <button data-turn="10">10° ►</button>
+              <button data-turn="20">20° ►</button>
+            </div>
+            <button id="resume-nav" class="wide">Riprendi navigazione propria</button>
+          </section>
+          <section class="field-group">
+            <div class="section-title"><span>Rotta</span><span class="unit">dist · ETA</span></div>
+            <ol id="route-list"></ol>
+            <div class="inline">
+              <select id="wp-select"></select>
+              <button id="direct-to" class="primary">Diretto a</button>
+            </div>
+            <button id="insert-wp" class="wide">Inserisci</button>
+          </section>
+          <!-- livello e velocità si autorizzano dal tag (clic sul valore): i campi restano solo come stato interno -->
+          <div class="secondary-groups" hidden>
+            <section class="field-group">
+            <div class="section-title"><span>Livello di volo</span><span class="unit">FL</span></div>
+            <div class="values two">
+              <div class="value-row"><span>Attuale</span><strong id="fl-current">-</strong></div>
+              <div class="value-row"><span>Autorizzato</span><strong id="fl-target">-</strong></div>
+            </div>
+            <div id="fl-vertical" class="hint">-</div>
+            <div class="stepper">
+              <button data-step-for="fl" data-step="-20">−20</button>
+              <button data-step-for="fl" data-step="-10">−10</button>
+              <input id="in-fl" type="number" min="50" max="450" step="10" />
+              <button data-step-for="fl" data-step="10">+10</button>
+              <button data-step-for="fl" data-step="20">+20</button>
+            </div>
+            <div id="fl-hint" class="hint">-</div>
+            <button id="set-fl" class="primary wide">Imposta livello</button>
+            </section>
+            <section class="field-group">
+            <div class="section-title"><span>Velocità</span><span class="unit">kt</span></div>
+            <div class="values two">
+              <div class="value-row"><span>Attuale</span><strong id="spd-current">-</strong></div>
+              <div class="value-row"><span id="spd-target-label">Assegnata</span><strong id="spd-target">-</strong></div>
+            </div>
+            <div class="stepper">
+              <button data-step-for="speed" data-step="-20">−20</button>
+              <button data-step-for="speed" data-step="-10">−10</button>
+              <input id="in-speed" type="number" min="160" max="560" step="1" />
+              <button data-step-for="speed" data-step="10">+10</button>
+              <button data-step-for="speed" data-step="20">+20</button>
+            </div>
+            <input id="in-speed-range" type="range" min="160" max="560" step="5" />
+            <div id="spd-hint" class="hint">-</div>
+            <div class="inline">
+              <button id="set-speed" class="primary">Imposta velocità</button>
+              <button id="resume-speed">Velocità propria</button>
+            </div>
+            </section>
+          </div>
+        </fieldset>
+      </div>
+    </aside>
+  </div>
+
+  <div id="start-screen" class="overlay">
+    <div class="start-card">
+      <header class="start-head">
+        <div>
+          <div class="brand">
+            <span class="brand-name">ACS SIMULATOR</span>
+            <span class="brand-sub">area control simulator · controllo del traffico aereo d'area</span>
+            <span id="brand-version" class="brand-version"></span>
+          </div>
+          <h1 id="start-title">ROMA ACC</h1>
+          <p id="start-sub" class="muted">-</p>
+          <p class="muted small">Scegli l'ACC, lo strato e il settore da controllare, poi regola traffico, meteo ed emergenze: la sessione parte con il tuo settore vuoto e quelli attorno già trafficati, e i primi voli ti vengono offerti nei primi minuti. Punti FRA, coste e confini dalla carta AIP Italia ENR 6.1-3; settorizzazione dalle SOP di Roma ACC e di Milano ACC; traffico su flussi fra aeroporti reali, con profili di salita e discesa calcolati sulle prestazioni degli aeromobili.</p>
+          <div class="start-links">
+            <button id="about-btn">Informazioni, fonti dei dati e crediti</button>
+            <button id="donate-btn" class="donate hidden">☕ Offrimi un caffè</button>
+          </div>
+        </div>
+        <div id="centre-tabs" role="tablist"></div>
+      </header>
+      <div class="start-body">
+        <div class="start-map-wrap">
+          <canvas id="start-map"></canvas>
+          <details class="rules">
+            <summary><h2>Regole del gioco</h2><span class="muted small">le stesse cose che insegna il tutorial, scritte</span></summary>
+            <ul>
+              <li><b>Prima volta?</b> Il <b>Tutorial guidato</b>, in alto nella colonna dei settori, insegna
+                tutto quello che c'è qui sotto passo per passo: dieci lezioni da una decina di minuti sul
+                simulatore vero, con il traffico preparato apposta e nessun errore che chiude la partita.</li>
+              <li><b class="c-yellow">Giallo</b> non in contatto · <b class="c-magenta">magenta</b> passato a te: clicca il tag per l'hand-on. Un clic sul tag seleziona il volo e ne mostra la rotta; le istruzioni si danno cliccando i campi della label · <b class="c-green">verde</b> in contatto.</li>
+              <li>L'uscita dipende dal livello finale del volo. Chi <b>sale</b> oltre il limite superiore si autorizza al livello più alto del settore e si passa al settore superiore <b>mentre si avvicina</b> a quel livello (tag <b>X190 ↑NWM</b>); chi <b>scende</b> verso l'aeroporto si autorizza al livello più basso e si passa al settore inferiore o all'APP (tag <b>X100 ↓APP</b>). Nei settori bassi, se la <b>STAR</b> dell'aeroporto di destinazione comincia nel settore, l'arrivo va portato al livello di trasferimento e passato all'APP <b>prima del punto iniziale della STAR</b> (tag <b>X180 VALMA</b>); le partenze vengono consegnate dall'APP sul <b>punto finale della SID</b>, sotto il limite inferiore del settore. Chi resta <b>livellato</b> esce dal suo <b>punto di coordinamento</b> (COP, cerchiato sul radar) al livello richiesto. L'hand-off si fa con la <b>barra spaziatrice</b> sul volo selezionato, o dal pulsante HAND-OFF della label.</li>
+              <li>Radar: ogni aereo è un punto con la scia delle posizioni precedenti, una ogni 12 secondi (più sono distanziate, più è veloce). Sul tag dei voli in contatto, un <b>clic sul livello o sulla velocità</b> apre l'elenco dei valori di 10 in 10: sceglierne uno impartisce subito l'istruzione, senza aprire l'etichetta. <b>Clic</b> sulla traccia: il tag ruota di 45° in senso orario, con la linea guida sempre della stessa lunghezza (i tag possono sovrapporsi, si sistemano a mano o tutti insieme una volta con <b>Deconflitta tag</b> nel menu Tag in basso; trascinandoli la distanza dalla traccia diventa libera, un clic sulla traccia la riporta fissa). Dove una traccia verde o magenta è vicina a una gialla, il clic va a quella di competenza. <b>Doppio clic sul nominativo</b>: vettore velocità (minuti regolabili con il cursore in basso; zoom e filtro dei tag per livello nella stessa barra). Trascina con <b>due dita</b> per spostare la mappa. In basso: <b>CPA</b> (clic su due aerei: distanza minima, minuti, separazione verticale), <b>R&amp;B</b> (due clic, inizio e fine: distanza e rilevamento nei due versi), cursore del <b>Vettore</b> velocità e menu <b>Mappa</b> con i filtri dei punti e delle zone non attive.</li>
+              <li>Semicircolare italiana: rotta 090°–269° livelli <b>dispari</b>, 270°–089° livelli <b>pari</b>.</li>
+              <li>Strati: <b>alti</b> da FL305 in crociera. Sotto, a <b>Roma ACC</b> i <b>medi</b> da FL195 a FL305 e i <b>bassi</b> fino a FL195, con gli arrivi da consegnare all'APP verso FL90-100 o sul punto iniziale della STAR; a <b>Milano ACC</b> un solo strato <b>basso</b> dall'avvicinamento a FL305, perché lì gli avvicinamenti salgono fino a FL145-FL155 e gli arrivi si consegnano a FL140-FL150. Le partenze compaiono dopo il decollo, gli altri voli dal bordo del radar.</li>
+              <li><b>Zone</b> (P, R, D, TSA, TRA): si attivano e si disattivano durante la partita, orari nel menu <b>Zone attive</b>. Attive in <b>grigio</b>, non si attraversano: vettora o cambia livello. Se un volo in contatto vi entrerà con rotta e livello autorizzato la zona diventa <b>rosso tenue</b> e accanto al nominativo compare un <b>asterisco rosso</b>: cliccandolo vedi la rotta, il punto d'ingresso, l'ora e fra quanto; troppo vicino: contorno più marcato e volo rosso.</li>
+              <li>Una perdita di separazione (5 NM / 1000 ft) chiude la partita. Anche 3 errori: hand-off al livello sbagliato, mancato, uscita lontana dal COP o ingresso in una zona attiva.</li>
+            </ul>
+          </details>
+        </div>
+        <div class="sector-pane">
+          <div id="sector-browse">
+            <button id="tutorial-cta">
+              <span class="cta-badge">NUOVO QUI?</span>
+              <span class="cta-main">
+                <strong>Tutorial guidato</strong>
+                <span id="tutorial-cta-sub" class="muted">Dieci lezioni: dal primo volo al turno completo</span>
+              </span>
+              <span class="cta-bar"><span id="tutorial-cta-fill"></span></span>
+              <span class="cta-go" id="tutorial-cta-go">Inizia ▸</span>
+            </button>
+            <div id="layer-tabs" role="tablist"></div>
+            <div id="layer-detail" class="muted">-</div>
+            <div id="sector-list"></div>
+          </div>
+          <!-- modalità guidata: elenco delle lezioni -->
+          <div id="tutorial-browse" class="hidden">
+            <button id="tutorial-back" class="setup-back">← Tutti i settori</button>
+            <div class="setup-head">
+              <strong>Tutorial guidato</strong>
+              <div class="sector-meta" id="tutorial-progress">-</div>
+              <div class="sector-desc">Si controlla davvero: traffico, autorizzazioni e coordinamento sono
+                quelli della simulazione. Qui però la situazione è preparata apposta e nessun errore chiude la
+                partita.</div>
+            </div>
+            <button id="tutorial-start" class="setup-start">Inizia</button>
+            <div id="lesson-list"></div>
+            <button id="tutorial-reset" class="setup-back">Azzera i progressi</button>
+          </div>
+
+          <!-- impostazioni della sessione: si aprono scegliendo un settore -->
+          <div id="sector-setup" class="hidden">
+            <div class="setup-scroll">
+              <button id="setup-back" class="setup-back">← Tutti i settori</button>
+              <div class="setup-head">
+                <strong id="setup-name">-</strong>
+                <div id="setup-meta" class="sector-meta">-</div>
+                <div id="setup-desc" class="sector-desc">-</div>
+              </div>
+
+              <section class="setup-block">
+                <h2>Traffico</h2>
+                <div id="setup-difficulty" class="seg" role="radiogroup" aria-label="Difficoltà"></div>
+                <p id="setup-traffic-note" class="setup-note">-</p>
+              </section>
+
+              <section class="setup-block">
+                <h2>Meteo</h2>
+                <div id="setup-wx-type" class="seg" aria-label="Fenomeni">
+                  <button type="button" data-wx="storms" aria-pressed="true">Temporali</button>
+                  <button type="button" data-wx="turbulence" aria-pressed="true">Turbolenza</button>
+                </div>
+                <label class="setup-slider">
+                  <span>Intensità</span>
+                  <input id="setup-wx" type="range" min="0" max="100" step="5" value="50">
+                  <output id="setup-wx-val">50%</output>
+                </label>
+                <p id="setup-wx-note" class="setup-note">-</p>
+              </section>
+
+              <section class="setup-block">
+                <h2>Emergenze</h2>
+                <label class="setup-slider">
+                  <span>Voli</span>
+                  <input id="setup-emg" type="range" min="0" max="10" step="0.5" value="2">
+                  <output id="setup-emg-val">2%</output>
+                </label>
+                <p id="setup-emg-note" class="setup-note">-</p>
+              </section>
+            </div>
+            <button id="setup-start" class="setup-start">Inizia la sessione</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="help" class="overlay hidden">
+    <div class="help-card">
+      <header class="help-head">
+        <h2>Comandi del radar</h2>
+        <button id="help-close" title="Chiudi (Esc)">✕</button>
+      </header>
+      <div class="help-body">
+        <section>
+          <h3>Modalità guidata</h3>
+          <ul>
+            <li>Il <b>Tutorial guidato</b> si apre dalla schermata iniziale (pulsante <b>Cambia</b>, in alto a
+              destra): dieci lezioni passo per passo sul simulatore vero, con il traffico preparato apposta.</li>
+            <li>Durante una lezione: <b>Invio</b> o <b>→</b> vanno avanti, <b>T</b> riduce il riquadro
+              dell'istruttore, <b>✕</b> torna all'elenco delle lezioni. I progressi restano salvati.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Label integrata</h3>
+          <ul>
+            <li><b>Livellato</b>: nominativo · livello e prossimo punto (EFX) · velocità e scia. Col mouse sopra anche la prua (HDG), il livello autorizzato (ALV) e il settore successivo (NXT).</li>
+            <li>Un volo <b>vettorato</b> mostra sempre la prua assegnata (HDG nel colore della label) finché non riprende la rotta; senza vettoramento la prua letta da bordo compare col mouse sopra.</li>
+            <li><b>In salita o discesa</b>: nominativo · livello con ↑↓, prossimo punto e rateo (VR, centinaia di ft/min: 15 = 1500) · velocità, scia e ALV · livello selezionato a bordo (SLB), solo se diverso dall'ALV. Col mouse sopra anche HDG, il settore successivo (NXT), il livello richiesto in rotta (XFL, viola) e il livello d'uscita dal settore (COO, arancione se l'autorizzato non lo rispetta).</li>
+            <li>In <b>ciano</b> i dati letti da bordo. <b>SLB</b> compare solo se a bordo è selezionato un livello diverso da quello autorizzato, e allora SLB e ALV sono arancioni (per qualche secondo dopo ogni autorizzazione, finché il pilota non lo imposta).</li>
+            <li>Col mouse sopra la label è grigia e i campi vuoti si leggono in minuscolo (efx, nxt, xfl, coo).</li>
+            <li>Il <b>livello di volo diventa arancione</b> quando un volo che deve uscire dall'alto o dal basso è a meno di 2000 ft dal livello di passaggio (COO) e ci sta andando: è il momento dell'hand-off. Il livello di passaggio è quello valido più vicino al limite del settore (limite FL105 → FL110, FL305 → FL300).</li>
+            <li>Se il livello autorizzato è diverso dal livello d'uscita dal settore, col mouse sopra il <b>COO</b> compare in arancione sia da livellato sia in salita o discesa.</li>
+            <li>Il traffico <b>non in contatto</b> (giallo) mostra solo nominativo e livello; col mouse sopra la label completa, con settore successivo e livello di passaggio ricavati dal suo piano di volo (per chi ci verrà passato: il nostro settore e il livello coordinato).</li>
+            <li><b>XFL</b> è il livello di crociera richiesto nel piano di volo, lo stesso per tutta la rotta.</li>
+            <li>Sui voli in contatto si cliccano <b>HDG</b> (di 5 in 5), <b>EFX</b> (diretto a: prima i punti della rotta, poi gli altri), <b>VR</b> (di 1 in 1: 08, 09, 10…), <b>ALV</b> e <b>SPD</b> (di 10 in 10).</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Traffico ed etichette</h3>
+          <ul>
+            <li><b>Clic sul tag</b>: seleziona il volo (traccia cerchiata e rotta celeste) e fa l'hand-on del traffico magenta.</li>
+            <li><b>Esc</b> o un clic sulla mappa vuota: deseleziona. Dove una label copre la traccia di un altro volo, il clic va alla label.</li>
+            <li><b>Barra spaziatrice</b>: hand-off del volo selezionato, come il pulsante HAND-OFF del pannello (non serve aprirlo). <b>Esc</b> esce anche dallo strumento attivo.</li>
+            <li><b>Clic su HDG, EFX, VR, ALV o SPD</b> nella label di un volo in contatto: elenco dei valori, l'istruzione parte subito.</li>
+            <li><b>Mouse sopra</b> una traccia o una label: la label si evidenzia in grigio e si vede completa, anche per il traffico non in contatto.</li>
+            <li><b>Clic sulla traccia</b>: il tag ruota di 45° in senso orario, con la linea guida sempre della stessa lunghezza; dopo un trascinamento la distanza è libera finché non si clicca di nuovo la traccia. Fra una traccia verde o magenta e una gialla vicine, il clic va a quella di competenza. I tag si possono anche trascinare e sovrapporre; <b>Deconflitta tag</b> nel menu <b>Tag</b> in basso li sistema tutti una volta sola.</li>
+            <li><b>Doppio clic sul nominativo</b>: accende o spegne il vettore velocità (lo spadino), lungo i minuti scelti con il cursore <b>Vettore</b> in basso.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Misure e mappa</h3>
+          <ul>
+            <li><b>R&amp;B</b> (range and bearing, pulsante in basso a sinistra o tasto <b>R</b>): clic sul punto d'inizio e poi su quello di fine, anche su un aereo (la linea lo segue). Sulla linea: rilevamento nei due versi e distanza, per esempio <b>121/301 119 NM</b>. Un clic sull'etichetta della linea la toglie; <b>Esc</b> annulla la linea in corso e spegne lo strumento.</li>
+            <li><b>CPA</b> (tasto <b>C</b>): clic su due aerei. Con prua, velocità e livello autorizzato attuali: distanza minima, minuti e separazione verticale in quel punto, per esempio <b>14 NM 13 MIN 6000 FT</b> (rosso se sotto 5 NM e 1000 ft). Un clic sull'etichetta la toglie.</li>
+            <li><b>Vettore</b> (cursore in basso): lunghezza in minuti del vettore velocità.</li>
+            <li><b>Mappa</b> (in basso): menu dei filtri: punti FRA tutti con il nome, solo i punti d'uscita (COP) o solo i simboli, se mostrare le zone non attive e le <b>STAR</b> (linee continue verdi, nome sul punto iniziale) e le <b>SID</b> (tratteggiate ambra, nome sul punto finale) delle piste in uso negli aeroporti visibili.</li>
+            <li><b>Due dita premute</b> (o tasto destro) trascinando, oppure strisciata a due dita: sposta la mappa. <b>Pizzica</b> o usa lo zoom nella barra in basso (il mirino ricentra sul settore).</li>
+            
+            <li>Menu <b>Tag</b> in basso: il filtro dei livelli nasconde solo le etichette del traffico non di competenza, le tracce restano sempre. All'apertura di un settore parte sui suoi livelli con 5 FL di margine.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Simboli e allarmi</h3>
+          <ul>
+            <li><b class="c-yellow">Giallo</b> non in contatto · <b class="c-magenta">magenta</b> passato a te, da assumere · <b class="c-green">verde</b> in contatto.</li>
+            <li>La traccia è un punto con la scia delle posizioni precedenti, una ogni 12 secondi: più sono distanziate, più il volo è veloce.</li>
+            <li><b>STCA</b>: linea rossa lampeggiante fra le due tracce. Se l'allarme ci riguarda, le tracce sono cerchiate e compare il tempo alla perdita di separazione; per gli allarmi dei settori vicini restano solo le tracce rosse e la linea.</li>
+            <li>Nel menu Simulazione, <b>Conflitti 5 min</b> mostra i conflitti previsti fra i voli di nostra competenza.</li>
+            <li><b>Zone attive</b>: in grigio chiaro, in attivazione entro 15 minuti tratteggiate con l'ora d'inizio (es. <b>R64 1240</b>). Se rotta e livello autorizzato portano un volo in contatto in una zona attiva, la zona diventa rosso tenue e accanto al nominativo compare un asterisco rosso: un clic sull'asterisco (o sul nominativo) seleziona il volo e mostra la rotta e il punto d'ingresso previsto: zona, livello, ora e minuti (es. <b>R51A F260 0839 5 MIN</b>). Troppo vicino (2,5 NM a un livello della zona, o dentro entro 2 minuti): zona e volo rossi. Entrarci è un errore.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div id="about" class="overlay hidden">
+    <div class="about-card">
+      <header class="about-head">
+        <div>
+          <h2>ACS Simulator <span id="about-version" class="muted"></span></h2>
+          <p id="about-tagline" class="muted"></p>
+        </div>
+        <button id="about-close" title="Chiudi (Esc)">✕</button>
+      </header>
+      <div class="about-body">
+        <p id="about-what"></p>
+        <div id="about-disclaimer" class="about-warn"></div>
+        <section>
+          <h3>Il progetto</h3>
+          <p>Nuove versioni, download per tutti i sistemi e segnalazione di errori o di dati sbagliati
+            stanno nella pagina del progetto.</p>
+          <div class="start-links">
+            <button id="about-project">Pagina del progetto e download</button>
+            <button id="about-issues">Segnala un problema</button>
+          </div>
+        </section>
+        <section>
+          <h3>Dati e fonti</h3>
+          <ul id="about-sources" class="about-sources"></ul>
+          <p class="muted small">L'elenco completo, con le licenze, è nel file CREDITI.md distribuito con il programma.</p>
+        </section>
+        <section>
+          <h3>Licenza</h3>
+          <p id="about-licence">ACS Simulator è gratuito: puoi scaricarlo, usarlo e parlarne quanto vuoi.
+            Il programma e i suoi contenuti sono © 2026 ACS Simulator, <b>tutti i diritti riservati</b>:
+            non sono consentite la ridistribuzione, la rivendita, la modifica né la pubblicazione di copie
+            senza autorizzazione scritta.</p>
+        </section>
+        <section id="about-support" class="hidden">
+          <h3>Sostieni il progetto</h3>
+          <p>ACS Simulator è scritto nel tempo libero e resterà gratuito. Se ti diverte o ti è utile, puoi
+            offrire un caffè a chi lo sviluppa: è il modo più diretto per far crescere i settori, le
+            procedure e le lezioni.</p>
+          <button id="about-donate" class="donate">☕ Offrimi un caffè</button>
+        </section>
+        <p id="about-contact" class="muted small"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="lesson-done" class="overlay hidden">
+    <div class="gameover-card lesson-card">
+      <div id="ld-badge">LEZIONE COMPLETATA</div>
+      <div id="ld-title">-</div>
+      <p id="ld-sub" class="muted">-</p>
+      <div id="ld-stars" class="ld-stars"></div>
+      <ul id="ld-learned"></ul>
+      <div class="go-stats" id="ld-stats"></div>
+      <div class="go-actions">
+        <button id="ld-next" class="primary">Lezione successiva ▸</button>
+        <button id="ld-again">Ripeti</button>
+        <button id="ld-list">Elenco lezioni</button>
+      </div>
+      <button class="donate donate-wide hidden" data-donate>☕ Ti è piaciuto? Offrimi un caffè</button>
+    </div>
+  </div>
+
+  <div id="gameover" class="overlay hidden">
+    <div class="gameover-card">
+      <div id="go-title">Partita terminata</div>
+      <p id="go-reason">-</p>
+      <ul id="go-details"></ul>
+      <div class="go-stats">
+        <div><span>Tempo in servizio</span><strong id="go-time">-</strong></div>
+        <div><span>Traffici assunti</span><strong id="go-assumed">-</strong></div>
+        <div><span>Hand-off corretti</span><strong id="go-handoffs">-</strong></div>
+      </div>
+      <div class="go-actions">
+        <button id="go-retry" class="primary">Rigioca il settore</button>
+        <button id="go-change">Cambia settore</button>
+      </div>
+      <button class="donate donate-wide hidden" data-donate>☕ Ti è piaciuto? Offrimi un caffè</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
