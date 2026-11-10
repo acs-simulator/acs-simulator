@@ -38,9 +38,9 @@ tutorial incluso. Serve un computer con mouse o trackpad e uno schermo di almeno
 
 | Sistema | File | Note |
 |---|---|---|
-| macOS 11 o successivo | `ACS Simulator-x.y.z-arm64.dmg` (Apple Silicon) o `-x64.dmg` (Intel) | vedi sotto |
-| Windows 10 o successivo | `ACS Simulator-x.y.z-setup.exe` | vedi sotto |
-| Linux | `ACS Simulator-x.y.z.AppImage` o `.deb` | rendi l'AppImage eseguibile con `chmod +x` |
+| macOS 11 o successivo | `ACS.Simulator-x.y.z-arm64.dmg` (Apple Silicon) o `-x64.dmg` (Intel) | vedi sotto |
+| Windows 10 o successivo | `ACS.Simulator-x.y.z-setup.exe` | vedi sotto |
+| Linux | `ACS.Simulator-x.y.z.AppImage` o `.deb` | rendi l'AppImage eseguibile con `chmod +x` |
 
 Servono circa 300 MB di spazio e uno schermo di almeno 1100×700. Nessuna
 connessione a internet, nessun account, nessun dato raccolto.
