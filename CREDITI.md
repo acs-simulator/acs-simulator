@@ -45,7 +45,8 @@ La rigenerazione dei dati si fa con gli script in `tools/`.
 | Node.js | MIT |
 
 Le licenze complete dei componenti sono incluse nei pacchetti distribuiti,
-nella cartella delle risorse dell'applicazione.
+nella cartella delle risorse dell'applicazione. La versione nel browser non usa
+nessuna libreria esterna.
 
 ## Il resto
 

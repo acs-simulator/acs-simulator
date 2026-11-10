@@ -21,6 +21,11 @@ export const CONTACT = '';
 export const PROJECT_URL = 'https://github.com/acs-simulator/acs-simulator';
 export const ISSUES_URL = `${PROJECT_URL}/issues`;
 
+// Sito con la pagina di presentazione e il simulatore giocabile nel browser (GitHub Pages).
+// Se un giorno il sito passa a un dominio proprio, cambia solo questa riga (e aggiungi il dominio
+// a ALLOWED_HOSTS in main.js).
+export const WEB_URL = 'https://acs-simulator.github.io/acs-simulator/';
+
 export const donateUrl = BUYMEACOFFEE_USER
   ? `https://www.buymeacoffee.com/${BUYMEACOFFEE_USER}`
   : '';

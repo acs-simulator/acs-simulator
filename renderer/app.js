@@ -159,7 +159,7 @@ function selectCentre(centreId) {
   });
   $('start-title').textContent = centre.name;
   $('start-sub').textContent = centre.description;
-  document.title = centre.name;
+  document.title = `ACS Simulator · ${centre.name}`;
   buildLayerTabs();
   selectLayer(centre.layerOrder.includes(activeLayer) ? activeLayer : centre.layerOrder[0]);
 }
@@ -989,6 +989,11 @@ for (const el of document.querySelectorAll('#about-donate, #donate-btn, #support
   el.addEventListener('click', () => openExternal(donateUrl));
 }
 $('about-project').addEventListener('click', () => openExternal(`${PROJECT_URL}/releases/latest`));
+// nel browser (non nell'applicazione) si invita a scaricare il programma completo
+if (!window.acs) {
+  $('download-btn').classList.remove('hidden');
+  $('download-btn').addEventListener('click', () => openExternal(`${PROJECT_URL}/releases/latest`));
+}
 $('about-issues').addEventListener('click', () => openExternal(ISSUES_URL));
 buildAbout();
 

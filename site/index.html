@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ACS Simulator — il controllo del traffico aereo, dal tuo schermo</title>
+<meta name="description" content="Simulatore gratuito di controllo del traffico aereo d'area con i settori reali di Roma ACC e Milano ACC. Si gioca nel browser o si scarica per macOS, Windows e Linux." />
+<meta name="theme-color" content="#050b12" />
+<link rel="icon" type="image/png" href="play/favicon.png" />
+<link rel="apple-touch-icon" href="play/apple-touch-icon.png" />
+
+<meta property="og:type" content="website" />
+<meta property="og:title" content="ACS Simulator — il controllo del traffico aereo, dal tuo schermo" />
+<meta property="og:description" content="Prendi in carico i voli, tienili separati, consegnali al settore successivo. Settori reali di Roma e Milano ACC, tutorial guidato, gratis." />
+<meta property="og:image" content="img/radar.jpg" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<style>
+  :root {
+    --bg: #050b12;
+    --panel: #0a1420;
+    --field: #0e1c28;
+    --line: rgba(120, 170, 180, 0.32);
+    --line-soft: rgba(120, 170, 180, 0.16);
+    --text: #d7e6ea;
+    --muted: rgba(215, 230, 234, 0.62);
+    --green: #7cfc9a;
+    --green-bg: #12362c;
+    --blue: #6ec8ff;
+    --yellow: #ffd75e;
+    --orange: #ffb84d;
+    --btn: #1d3347;
+    --edge-light: #4a6d88;
+    --edge-dark: #02060a;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  a { color: var(--blue); }
+  .wrap { width: min(1080px, 100% - 40px); margin: 0 auto; }
+
+  /* --- barra --- */
+  .bar { border-bottom: 1px solid var(--line-soft); }
+  .bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; }
+  .brand { font-family: ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 0.2em; color: var(--green); font-size: 14px; text-decoration: none; }
+  .bar nav { display: flex; gap: 18px; font-size: 14px; }
+  .bar nav a { color: var(--muted); text-decoration: none; }
+  .bar nav a:hover { color: var(--text); }
+
+  /* --- pulsanti squadrati in rilievo, come nel simulatore --- */
+  .btn {
+    display: inline-block;
+    padding: 12px 22px;
+    font: inherit;
+    font-size: 16px;
+    color: var(--text);
+    text-decoration: none;
+    background: var(--btn);
+    border: 1px solid;
+    border-color: var(--edge-light) var(--edge-dark) var(--edge-dark) var(--edge-light);
+    cursor: pointer;
+  }
+  .btn:hover { background: #24425a; }
+  .btn.primary { color: var(--green); background: var(--green-bg); border-color: var(--green); font-weight: 600; }
+  .btn.primary:hover { background: #18463a; }
+  .btn.donate { color: var(--yellow); border-color: var(--yellow); background: rgba(255, 215, 94, 0.08); }
+  .btn.donate:hover { background: rgba(255, 215, 94, 0.18); }
+  .btn small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+
+  /* --- testata --- */
+  .hero { padding: 64px 0 40px; text-align: center; }
+  .hero h1 {
+    margin: 0 0 14px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: clamp(34px, 6vw, 60px);
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+    color: var(--blue);
+  }
+  .hero h1 span { color: var(--green); }
+  .lead { max-width: 720px; margin: 0 auto 28px; font-size: clamp(17px, 2.2vw, 20px); color: var(--text); }
+  .cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+  .note { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+
+  .shot { margin: 40px auto 0; border: 1px solid var(--line); background: var(--panel); padding: 6px; }
+  .shot img { display: block; width: 100%; height: auto; }
+
+  /* --- sezioni --- */
+  section { padding: 56px 0; border-top: 1px solid var(--line-soft); }
+  h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--blue); font-weight: 600; }
+  .title { margin: 0 0 18px; font-size: clamp(24px, 3.4vw, 34px); line-height: 1.25; font-weight: 600; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 26px; }
+  .card { padding: 18px; background: var(--panel); border: 1px solid var(--line-soft); }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .card p { margin: 0; font-size: 14.5px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; align-items: center; }
+  .split p { color: var(--muted); }
+  .split ul { padding-left: 20px; color: var(--muted); }
+  .split li { margin-bottom: 6px; }
+  @media (max-width: 800px) { .split { grid-template-columns: 1fr; } }
+
+  /* --- scarica --- */
+  .dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 22px; }
+  .dl .btn { text-align: left; }
+  .dl .recommended { border-color: var(--green); }
+  .help { margin-top: 22px; padding: 14px 16px; background: var(--panel); border-left: 3px solid var(--orange); font-size: 14px; color: var(--muted); }
+  .help b { color: var(--text); }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; background: var(--field); padding: 1px 5px; }
+
+  .warn { margin-top: 26px; padding: 14px 16px; background: rgba(255, 184, 77, 0.07); border-left: 3px solid var(--orange); font-size: 14px; color: #ffdba6; }
+
+  /* --- piede --- */
+  footer { padding: 36px 0 52px; border-top: 1px solid var(--line-soft); font-size: 13.5px; color: var(--muted); }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px; }
+  footer nav { display: flex; flex-wrap: wrap; gap: 18px; }
+  footer p { margin: 0 0 6px; max-width: 520px; }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" href="#">ACS SIMULATOR</a>
+    <nav>
+      <a href="#cosa">Cos'è</a>
+      <a href="#scarica">Scarica</a>
+      <a href="https://github.com/acs-simulator/acs-simulator">Progetto</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <h1>Controlla il cielo<br /><span>da una sala radar</span></h1>
+    <p class="lead">
+      Un simulatore gratuito di <b>controllo del traffico aereo d'area</b>, con i settori reali di
+      Roma ACC e Milano ACC. Prendi in carico i voli, tienili separati, consegnali al settore successivo.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="play/" id="play">Gioca ora nel browser<small>nessuna installazione</small></a>
+      <a class="btn" href="#scarica" id="download">Scarica per il computer<small id="download-os">macOS · Windows · Linux</small></a>
+    </div>
+    <p class="note">Gratis, senza account. Serve un computer con mouse o trackpad e uno schermo di almeno 1100×700.</p>
+
+    <div class="shot"><img src="img/radar.jpg" width="1470" height="820" alt="Il radar di ACS Simulator durante una sessione: tracce verdi, gialle e magenta sul settore NW Alto di Roma ACC" /></div>
+  </div>
+
+  <section id="cosa">
+    <div class="wrap">
+      <h2>Cos'è</h2>
+      <p class="title">Non si fanno atterrare gli aerei. Si tengono lontani l'uno dall'altro.</p>
+      <p style="max-width: 760px; color: var(--muted)">
+        Il controllore d'area segue i voli in rotta, da una sala senza finestre. Il tuo compito è prendere in carico
+        gli aerei che entrano nel tuo settore, mantenere <b>5 miglia o 1000 piedi</b> fra l'uno e l'altro, e passarli
+        al settore successivo nel punto e al livello concordati. Nel frattempo il mondo non sta fermo.
+      </p>
+      <div class="cols">
+        <div class="card"><h3>Settori veri</h3><p>Roma ACC su tre strati, dalla Toscana alla Sicilia, e Milano ACC: punti FRA, rotte, procedure e zone riservate ricostruiti su dati reali.</p></div>
+        <div class="card"><h3>Traffico che si comporta</h3><p>Voli su flussi veri fra aeroporti, profili di salita e discesa calcolati sulle prestazioni di ogni aeromobile, semicircolare italiana compresa.</p></div>
+        <div class="card"><h3>Imprevisti</h3><p>Temporali da aggirare, zone militari che si attivano, richieste di livello, turbolenza, avarie radio, MAYDAY.</p></div>
+        <div class="card"><h3>Difficoltà a scelta</h3><p>Da cinque a dieci voli in contatto insieme, con conflitti costruiti su misura e un tempo di reazione che si accorcia.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tutorial">
+    <div class="wrap split">
+      <div>
+        <h2>Si impara giocando</h2>
+        <p class="title">Dieci lezioni, da zero a un turno completo.</p>
+        <p>Il tutorial guidato non è un filmato: si controlla davvero, sulla simulazione vera. Ogni lezione prepara la situazione che serve e ti segue passo per passo, e nessun errore chiude la partita finché sei lì dentro.</p>
+        <ul>
+          <li>Il radar e il settore, le tracce, i colori</li>
+          <li>Prendere in carico, dare istruzioni, passare i voli</li>
+          <li>Separazione e conflitti, zone attive, meteo</li>
+          <li>Emergenze e un turno di prova</li>
+        </ul>
+        <p><a class="btn primary" href="play/">Prova la prima lezione</a></p>
+      </div>
+      <div class="shot" style="margin: 0"><img src="img/tutorial.jpg" width="1470" height="820" loading="lazy" alt="Il riquadro dell'istruttore durante la prima lezione del tutorial" /></div>
+    </div>
+  </section>
+
+  <section id="scarica">
+    <div class="wrap">
+      <h2>Scarica</h2>
+      <p class="title">Il programma completo, per il tuo computer.</p>
+      <p style="max-width: 760px; color: var(--muted)">La versione da scaricare è la stessa che si gioca nel browser, in una finestra tutta sua. Funziona senza connessione, non chiede account e non raccoglie dati.</p>
+      <div class="dl">
+        <a class="btn" data-os="mac" href="https://github.com/acs-simulator/acs-simulator/releases/latest">macOS<small>Apple Silicon e Intel · .dmg</small></a>
+        <a class="btn" data-os="win" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Windows<small>10 o successivo · installer .exe</small></a>
+        <a class="btn" data-os="linux" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Linux<small>.AppImage e .deb</small></a>
+      </div>
+      <div class="help">
+        <b>Al primo avvio</b> il sistema avverte che l'autore non è verificato: il programma non è firmato con un certificato a pagamento.
+        Su <b>macOS</b> apri con <b>clic destro → Apri</b>; su <b>Windows</b> scegli <b>Ulteriori informazioni → Esegui comunque</b>.
+        Le istruzioni complete sono nella <a href="https://github.com/acs-simulator/acs-simulator#al-primo-avvio">pagina del progetto</a>.
+      </div>
+    </div>
+  </section>
+
+  <section id="sostegno">
+    <div class="wrap">
+      <h2>Sostieni il progetto</h2>
+      <p class="title">Gratuito, e resterà così.</p>
+      <p style="max-width: 760px; color: var(--muted)">ACS Simulator è un progetto indipendente, scritto nel tempo libero. Se ti diverte, offrire un caffè è il modo più diretto per aiutarlo a crescere: nuovi settori, più procedure, altre lezioni.</p>
+      <p><a class="btn donate" href="https://www.buymeacoffee.com/acssimulator">☕ Offrimi un caffè</a></p>
+      <div class="warn"><b>Nessun valore operativo.</b> ACS Simulator è una simulazione didattica e ricreativa. I dati aeronautici sono una ricostruzione parziale, non aggiornata agli ultimi cicli AIRAC, e non rappresentano le procedure in vigore: non possono essere usati per la navigazione aerea né per l'addestramento professionale. Non è prodotto, approvato né sostenuto da ENAV S.p.A., da IVAO o da VATSIM.</div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <p><b style="color: var(--green); letter-spacing: 0.14em; font-family: ui-monospace, Menlo, monospace">ACS SIMULATOR</b></p>
+      <p>Area Control Simulator · © 2026 ACS Simulator, tutti i diritti riservati. Gratuito per uso personale.</p>
+    </div>
+    <nav>
+      <a href="https://github.com/acs-simulator/acs-simulator">Progetto</a>
+      <a href="https://github.com/acs-simulator/acs-simulator/issues">Segnala un problema</a>
+      <a href="https://github.com/acs-simulator/acs-simulator/blob/main/CREDITI.md">Fonti dei dati e crediti</a>
+      <a href="https://github.com/acs-simulator/acs-simulator/blob/main/LICENSE">Licenza</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  // evidenzia il sistema di chi guarda la pagina
+  (function () {
+    var ua = navigator.userAgent || '';
+    var os = /Windows/.test(ua) ? 'win' : /Mac/.test(ua) && !/iPhone|iPad/.test(ua) ? 'mac' : /Linux|X11/.test(ua) && !/Android/.test(ua) ? 'linux' : null;
+    var names = { mac: 'macOS', win: 'Windows', linux: 'Linux' };
+    // su telefono o schermo stretto il radar non è utilizzabile: meglio dirlo prima del clic
+    if (window.matchMedia('(max-width: 1000px), (pointer: coarse)').matches) {
+      document.querySelector('#play small').textContent = 'da un computer, con mouse o trackpad';
+    }
+    if (!os) return;
+    var btn = document.querySelector('[data-os="' + os + '"]');
+    if (btn) btn.classList.add('recommended');
+    document.getElementById('download-os').textContent = 'per ' + names[os];
+  })();
+</script>
+</body>
+</html>

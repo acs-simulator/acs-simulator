@@ -2163,3 +2163,35 @@ button.link {
   font-size: 12.5px;
   cursor: pointer;
 }
+
+/* =========================================================================
+   Versione nel browser: schermi troppo piccoli
+   ========================================================================= */
+
+#screen-guard {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+  text-align: center;
+}
+
+.guard-card {
+  max-width: 420px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  line-height: 1.5;
+}
+
+.guard-card strong { display: block; margin-bottom: 8px; color: var(--blue); font-size: 16px; }
+.guard-card p { margin: 0; font-size: 14px; }
+
+/* l'applicazione desktop ha una finestra minima di 1100x700: lì il riquadro non compare mai */
+@media (max-width: 1000px), (max-height: 600px) {
+  #screen-guard { display: flex; }
+}

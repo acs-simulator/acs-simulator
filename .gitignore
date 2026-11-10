@@ -1,6 +1,7 @@
 # dipendenze e build
 node_modules/
 dist/
+_site/
 out/
 *.log
 
