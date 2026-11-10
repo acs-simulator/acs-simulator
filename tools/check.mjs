@@ -66,6 +66,19 @@ check('package.json: non pubblicabile su npm per sbaglio', pkg.private === true)
 const icon = fs.existsSync(path.join(ROOT, 'build/icon.png')) && fs.statSync(path.join(ROOT, 'build/icon.png'));
 check('icona di almeno 10 KB', icon && icon.size > 10_000);
 
+// --- sito ----------------------------------------------------------------------
+
+section('Sito');
+for (const file of ['site/index.html', 'site/img/radar.jpg', 'renderer/favicon.png', '.github/workflows/sito.yml']) {
+  check(file, fs.existsSync(path.join(ROOT, file)), 'manca dalla cartella del progetto');
+}
+const built = (await import('node:child_process')).spawnSync('node', ['tools/build-site.mjs'], { cwd: ROOT, encoding: 'utf8' });
+check('il sito si assembla', built.status === 0, built.stderr);
+check('_site/play contiene il simulatore', fs.existsSync(path.join(ROOT, '_site/play/index.html'))
+  && fs.existsSync(path.join(ROOT, '_site/play/sim.js')));
+const landing = fs.existsSync(path.join(ROOT, 'site/index.html')) ? fs.readFileSync(path.join(ROOT, 'site/index.html'), 'utf8') : '';
+check('la pagina rimanda al simulatore e ai download', landing.includes('href="play/"') && landing.includes('/releases/latest'));
+
 // --- 2. sostegno al progetto -------------------------------------------------
 
 section('Sostegno al progetto');

@@ -25,6 +25,13 @@ ACC dalle loro SOP, le **SID e STAR** degli aeroporti italiani, il traffico
 generato sui flussi veri fra aeroporti con profili di salita e discesa calcolati
 sulle prestazioni di ogni tipo di aeromobile.
 
+## Gioca online
+
+**[→ Gioca nel browser](https://acs-simulator.github.io/acs-simulator/)**, senza
+installare niente. È la stessa simulazione del programma da scaricare, con il
+tutorial incluso. Serve un computer con mouse o trackpad e uno schermo di almeno
+1100×700 pixel: su telefono e tablet il radar non è ancora utilizzabile.
+
 ## Scarica
 
 **[→ Scarica l'ultima versione](https://github.com/acs-simulator/acs-simulator/releases/latest)** per macOS, Windows o Linux.
@@ -101,11 +108,15 @@ npm install
 |---|---|
 | `npm start` | avvia il simulatore |
 | `npm test` | controlli di pacchetto e bilanciamento della simulazione |
+| `npm run site` | assembla il sito (presentazione + versione nel browser) in `_site/` |
 | `npm run dist` | pacchetti per il sistema corrente, in `dist/` |
 | `npm run dist:win` | installer per Windows (richiede Windows, o la via automatica qui sotto) |
 
 I pacchetti per i tre sistemi si costruiscono anche senza avere i tre computer:
 pubblica un tag di versione e ci pensa GitHub Actions (`.github/workflows/pacchetti.yml`).
+Il sito, con la versione giocabile nel browser, si aggiorna da solo a ogni push su `main`
+(`.github/workflows/sito.yml`); nelle impostazioni del repository, *Pages → Source*
+va impostato su **GitHub Actions**.
 
 Il **banco di prova** fa girare la simulazione senza interfaccia, con un controllore
 automatico, e misura carico, offerte orarie, allarmi e tempi di calcolo: serve a

@@ -9,6 +9,7 @@ const path = require('path');
 const ALLOWED_HOSTS = [
   'buymeacoffee.com',
   'github.com',
+  'acs-simulator.github.io',
   'www.enav.it',
   'enav.it',
   'ivao.aero',

@@ -22,7 +22,8 @@
     "dist:mac": "electron-builder --mac",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
-    "pack": "electron-builder --dir"
+    "pack": "electron-builder --dir",
+    "site": "node tools/build-site.mjs"
   },
   "devDependencies": {
     "electron": "^32.0.0",
@@ -51,7 +52,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["arm64", "x64"]
+          "arch": [
+            "arm64",
+            "x64"
+          ]
         }
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}"
@@ -63,7 +67,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "${productName}-${version}-setup.${ext}"
@@ -76,7 +82,10 @@
     },
     "linux": {
       "category": "Game",
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "artifactName": "${productName}-${version}.${ext}"
     }
   }
