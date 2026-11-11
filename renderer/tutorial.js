@@ -526,9 +526,7 @@ export const LESSONS = [
       {
         title: 'Arriva traffico in conflitto',
         text: `Il settore vicino ti sta passando un volo che incrocia uno dei tuoi. Hai qualche minuto per
-          accorgertene: prendilo in carico e guarda dove va.<br><br>
-          Nel menu Simulazione puoi accendere <b>⚠ Conflitti 5 min</b>: segna le coppie che perderanno la
-          separazione entro cinque minuti.`,
+          accorgertene: prendilo in carico e guarda dove va.`,
         goal: 'Prendi in carico il traffico magenta',
         hint: 'Clic sul tag magenta. Se non lo vedi, è appena fuori dal confine.',
         arm: (c) => {
