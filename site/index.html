@@ -8,14 +8,26 @@
 <meta name="theme-color" content="#050b12" />
 <link rel="icon" type="image/png" href="play/favicon.png" />
 <link rel="apple-touch-icon" href="play/apple-touch-icon.png" />
-<link rel="preload" as="image" href="img/sala-turno.jpg" />
+<link rel="preload" as="image" href="img/foto-turno.webp" />
 
 <meta property="og:type" content="website" />
 <meta property="og:title" content="ACS Simulator — il controllo del traffico aereo, dal tuo schermo" />
 <meta property="og:description" content="Prendi in carico i voli, tienili separati, consegnali al settore successivo. Settori reali di Roma e Milano ACC, tutorial guidato, gratis." />
-<meta property="og:image" content="img/sala-turno.jpg" />
+<meta property="og:image" content="img/foto-turno.jpg" />
 <meta name="twitter:card" content="summary_large_image" />
 
+<script>
+  // js: le animazioni partono da nascoste. flat: telefono o "riduci movimento", la testata non si tuffa
+  (function () {
+    var h = document.documentElement;
+    h.classList.add('js');
+    var q = window.matchMedia('(max-width: 700px), (prefers-reduced-motion: reduce)');
+    var set = function () { h.classList.toggle('flat', q.matches); };
+    set();
+    if (q.addEventListener) q.addEventListener('change', set);
+  })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js" defer></script>
 <style>
   /* colori e caratteri del simulatore (renderer/style.css) */
   :root {
@@ -44,6 +56,7 @@
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
+  html.lenis { scroll-behavior: auto; }
   body {
     margin: 0;
     background: var(--bg);
@@ -51,15 +64,26 @@
     font-family: var(--sans);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
   ::selection { background: var(--green-bg); color: var(--green); }
   a { color: var(--blue); text-underline-offset: 3px; text-decoration-thickness: 1px; }
   a:hover { color: #a6dcff; }
   :focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
-  img { display: block; max-width: 100%; height: auto; }
+  img, video { display: block; max-width: 100%; height: auto; }
   b { font-weight: 600; color: var(--text); }
   .wrap { width: min(1160px, 100% - 40px); margin: 0 auto; }
   .mono { font-family: var(--mono); }
+
+  /* --- comparsa allo scroll: sale, si mette a fuoco, si accende --- */
+  .js [data-reveal] {
+    opacity: 0;
+    transform: translateY(28px);
+    filter: blur(6px);
+    transition: opacity 0.9s var(--ease), transform 1.1s var(--ease), filter 0.9s var(--ease);
+    transition-delay: calc(var(--d, 0) * 110ms);
+  }
+  .js [data-reveal].in { opacity: 1; transform: none; filter: none; }
 
   /* --- pulsanti squadrati in rilievo, come nel simulatore --- */
   .btn {
@@ -74,8 +98,24 @@
     border: 1px solid;
     border-color: var(--edge-light) var(--edge-dark) var(--edge-dark) var(--edge-light);
     cursor: pointer;
-    transition: background-color 0.15s;
+    transition: background-color 0.15s, translate 0.35s var(--ease);
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
   }
+  .js .btn[data-reveal] { transition: opacity 0.9s var(--ease), transform 1.1s var(--ease), filter 0.9s var(--ease), translate 0.35s var(--ease), background-color 0.15s; }
+  /* un riflesso di luce attraversa il pulsante quando ci si passa sopra */
+  .btn::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.13) 50%, transparent 65%);
+    transform: translateX(-115%);
+    transition: transform 0.8s var(--ease);
+    pointer-events: none;
+  }
+  .btn:hover::before { transform: translateX(115%); }
   .btn:hover { background: #24425a; color: var(--text); }
   .btn:active { border-color: var(--edge-dark) var(--edge-light) var(--edge-light) var(--edge-dark); }
   .btn.primary { color: var(--green); background: var(--green-bg); border-color: var(--green); font-weight: 600; }
@@ -94,201 +134,312 @@
   .bar nav a { color: var(--text); opacity: 0.75; text-decoration: none; }
   .bar nav a:hover { opacity: 1; color: var(--text); }
 
-  /* --- testata: la sala radar a tutto schermo --- */
+  /* --- testata: la sala radar a tutto schermo ---
+     La foto si muove di poco col mouse e scorre più lenta della pagina; nella luce dei monitor
+     galleggia un po' di pulviscolo. I valori li scrive lo script in fondo. */
   .hero {
-    --h: clamp(640px, 94svh, 960px);
     position: relative;
-    min-height: var(--h);
+    min-height: clamp(640px, 100svh, 980px);
     display: flex;
     align-items: center;
     overflow: hidden;
     isolation: isolate;
   }
-  .hero-art { position: absolute; inset: 0; z-index: -1; overflow: hidden; }
-  /* riquadro con le proporzioni dell'illustrazione: alto quanto la testata, con i due controllori
-     (al 43% dell'immagine) spostati a destra del testo; il bordo sinistro sfuma nel fondo */
+  .hero-art { position: absolute; inset: 0; z-index: -1; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 74%, transparent 100%); mask-image: linear-gradient(180deg, #000 74%, transparent 100%); }
+  /* la foto, appoggiata in basso e larga poco più dello schermo: la testa di lei cade a destra del
+     testo e quella di lui resta dentro. I bordi sinistro e alto sfumano nel fondo */
   .hero-frame {
     position: absolute;
-    left: 60%;
-    top: 50%;
-    width: max(100%, calc(var(--h) * 1.92));
-    aspect-ratio: 2400 / 1250;
-    transform: translate(-43%, -50%);
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16%);
-    mask-image: linear-gradient(90deg, transparent 0, #000 16%);
+    left: 2%;
+    bottom: -4%;
+    width: max(111vw, 160vh);
+    aspect-ratio: 2 / 1;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16%), linear-gradient(180deg, transparent 0, #000 22%);
+    -webkit-mask-composite: source-in;
+    mask-image: linear-gradient(90deg, transparent 0, #000 16%), linear-gradient(180deg, transparent 0, #000 22%);
+    mask-composite: intersect;
+    will-change: transform;
   }
-  .hero-frame img { width: 100%; height: 100%; animation: settle 2.8s var(--ease) both; }
-  @keyframes settle { from { transform: scale(1.045); filter: brightness(0.75); } }
-  .hero-art::after {
-    content: "";
+  .hero-frame img { width: 100%; height: 100%; object-fit: cover; animation: settle 3.2s var(--ease) both; }
+  @keyframes settle { from { transform: scale(1.08); filter: brightness(0.4) blur(4px); } }
+  /* pulviscolo nella luce dei monitor */
+  .dust { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; }
+  .shade {
     position: absolute;
     inset: 0;
+    pointer-events: none;
     background:
-      linear-gradient(90deg, rgba(5, 11, 18, 0.92) 0%, rgba(5, 11, 18, 0.8) 32%, rgba(5, 11, 18, 0.3) 52%, rgba(5, 11, 18, 0) 64%),
-      linear-gradient(180deg, rgba(5, 11, 18, 0.7) 0%, rgba(5, 11, 18, 0) 16%, rgba(5, 11, 18, 0) 78%, var(--bg) 100%);
+      linear-gradient(90deg, rgba(5, 11, 18, 0.9) 0%, rgba(5, 11, 18, 0.7) 34%, rgba(5, 11, 18, 0.15) 52%, rgba(5, 11, 18, 0) 60%),
+      linear-gradient(180deg, rgba(5, 11, 18, 0.7) 0%, rgba(5, 11, 18, 0) 16%);
   }
-  .hero-copy { padding: 120px 0 90px; max-width: 640px; }
+  .hero-copy-wrap { position: relative; z-index: 2; }
+  .hero-copy { padding: 110px 0 120px; max-width: 680px; will-change: transform, opacity; }
   .hero h1 {
     margin: 0 0 22px;
     font-family: var(--mono);
-    font-size: clamp(34px, 4vw, 58px);
+    font-size: clamp(34px, 3.9vw, 58px);
     letter-spacing: 0.01em;
     line-height: 1.08;
     color: var(--blue);
-    text-wrap: balance;
   }
-  .hero h1 span { color: var(--green); }
-  .lead { margin: 0 0 30px; font-size: clamp(17px, 1.7vw, 20px); color: var(--text); max-width: 34em; }
+  .hero h1 span { display: block; }
+  .hero h1 span + span { color: var(--green); }
+  /* le due righe del titolo si scrivono come sul radar, una dopo l'altra */
+  .js .hero h1 span { clip-path: inset(0 100% 0 0); animation: type 0.7s steps(18, end) forwards; }
+  .js .hero h1 span + span { animation-delay: 0.55s; }
+  @keyframes type { to { clip-path: inset(0 0 0 0); } }
+  .lead { margin: 0 0 30px; font-size: clamp(17px, 1.7vw, 20px); max-width: 30em; }
   .cta { display: flex; flex-wrap: wrap; gap: 12px; }
-  .note { margin: 16px 0 0; font-size: 13.5px; color: var(--muted); max-width: 34em; }
+  .note { margin: 16px 0 0; font-size: 13.5px; color: var(--muted); }
+  .scroll-cue {
+    position: absolute;
+    left: 50%;
+    bottom: 26px;
+    width: 1px;
+    height: 46px;
+    background: linear-gradient(var(--green), transparent);
+    opacity: 0.8;
+    animation: cue 2.4s var(--ease) infinite;
+  }
+  @keyframes cue { 0% { transform: scaleY(0); transform-origin: top; } 50% { transform: scaleY(1); transform-origin: top; } 51% { transform-origin: bottom; } 100% { transform: scaleY(0); transform-origin: bottom; } }
+  @keyframes blink { 50% { opacity: 0; } }
 
-  /* tag radar sull'illustrazione: magenta = passato a te, verde = in contatto */
-  .tag {
+  /* la frequenza: quello che si sente in cuffia, scritto mentre lo si dice */
+  .radio {
     position: absolute;
-    left: 60.4%;
-    top: 46.9%;
-    font: 700 13px/1.25 var(--mono);
-    color: var(--magenta);
-    background: none;
-    border: 0;
-    padding: 0;
-    cursor: pointer;
-    text-align: left;
+    right: max(20px, calc((100% - 1160px) / 2));
+    bottom: 30px;
+    z-index: 2;
+    width: min(460px, 38vw);
+    font: 12.5px/1.65 var(--mono);
+    color: rgba(215, 230, 234, 0.85);
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
   }
-  .tag::before {
-    /* il plot del volo */
-    content: "";
-    position: absolute;
-    left: -5px;
-    top: -5px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: currentColor;
-  }
-  .tag .leader { position: absolute; left: 4px; top: -24px; width: 28px; height: 1px; background: currentColor; transform: rotate(-40deg); transform-origin: 0 0; }
-  .tag .block { position: absolute; left: 30px; top: -56px; white-space: nowrap; padding: 3px 6px; text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); }
-  .tag .block i { font-style: normal; display: block; font-weight: 400; }
-  .tag .hint {
-    position: absolute;
-    left: 30px;
-    top: -84px;
-    white-space: nowrap;
-    font: 500 12px/1 var(--sans);
-    color: var(--text);
-    background: rgba(5, 11, 18, 0.82);
-    border: 1px solid var(--line);
-    padding: 6px 8px;
-  }
-  .tag:not(.taken) .block { animation: blink 1.1s steps(1) infinite; outline: 1px solid rgba(255, 91, 216, 0.6); }
-  @keyframes blink { 50% { opacity: 0.35; } }
-  .tag.taken { color: var(--green); cursor: default; }
-  .tag.taken .hint { color: var(--green); border-color: rgba(124, 252, 154, 0.5); }
+  .radio .head { display: block; margin-bottom: 6px; color: var(--muted); font-size: 11px; letter-spacing: 0.12em; }
+  .radio .head::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: var(--green); vertical-align: 1px; }
+  .radio p { margin: 0; min-height: 1.65em; transition: opacity 0.8s ease; }
+  .radio p.old { opacity: 0.4; }
+  .radio .who { margin-right: 10px; }
+  .radio .atc { color: var(--green); }
+  .radio .pilot { color: var(--yellow); }
+  .radio .typing::after { content: "\258D"; color: var(--green); animation: blink 0.9s steps(1) infinite; }
 
   /* --- sezioni --- */
-  section { padding: clamp(72px, 9vw, 120px) 0; }
-  h2 { margin: 0 0 20px; font-size: clamp(28px, 3.6vw, 42px); line-height: 1.18; font-weight: 650; letter-spacing: -0.01em; text-wrap: balance; }
-  h2 .mono { font-weight: 700; color: var(--blue); letter-spacing: 0; }
-  .intro { max-width: 40em; color: var(--muted); font-size: 17px; margin: 0; }
-  .intro + .intro { margin-top: 14px; }
+  section { padding: clamp(80px, 10vw, 140px) 0; }
+  h2 { margin: 0 0 18px; font-size: clamp(30px, 3.8vw, 46px); line-height: 1.15; font-weight: 650; letter-spacing: -0.01em; text-wrap: balance; }
+  h2.mono { font-family: var(--mono); font-weight: 700; letter-spacing: 0; color: var(--blue); }
+  .intro { max-width: 34em; color: var(--muted); font-size: 18px; margin: 0; }
 
-  /* lo schermo del radar */
-  .screen-sec { padding-top: 40px; }
-  .screen-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: end; margin-bottom: 34px; }
-  .shot { border: 1px solid var(--line); background: var(--panel); padding: 6px; box-shadow: 0 28px 60px -24px rgba(0, 0, 0, 0.8); }
-  .legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; border-top: 1px solid var(--line-soft); }
-  .legend div { padding: 20px 24px 0 0; }
-  .legend dt { font: 700 15px/1.3 var(--mono); margin-bottom: 6px; }
-  .legend dt i { font-style: normal; font-weight: 400; display: block; }
-  .legend dd { margin: 0; color: var(--muted); font-size: 15px; max-width: 26em; }
-  .c-yellow { color: var(--yellow); }
-  .c-magenta { color: var(--magenta); }
-  .c-green { color: var(--green); }
-
-  /* immagine accanto al testo */
-  .split { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
-  .split.flip > :first-child { order: 2; }
-  .art { position: relative; }
-  .art img { width: 100%; }
-  .art::after { content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px var(--line-soft); pointer-events: none; }
-  .art figcaption { margin-top: 10px; font-size: 13px; color: var(--muted); }
-
-  .facts { margin: 30px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line-soft); }
-  .facts li { display: grid; grid-template-columns: 11em minmax(0, 1fr); gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line-soft); }
-  .facts b { color: var(--green); font-weight: 600; }
-  .facts span { color: var(--muted); font-size: 15px; }
-
-  .steps { margin: 22px 0 28px; padding: 0; list-style: none; counter-reset: s; }
-  .steps li { position: relative; padding: 7px 0 7px 34px; color: var(--muted); }
-  .steps li::before { counter-increment: s; content: counter(s); position: absolute; left: 0; top: 7px; font: 700 13px/24px var(--mono); width: 22px; height: 24px; text-align: center; color: var(--green); border: 1px solid rgba(124, 252, 154, 0.4); }
-
-  /* la sala intera: invito finale */
-  .room { position: relative; padding: 0 0 clamp(72px, 9vw, 120px); isolation: isolate; }
-  .room-art { position: relative; overflow: hidden; }
-  .room-art img { width: 100%; min-height: 380px; object-fit: cover; object-position: 50% 30%; }
-  .room-art::after {
+  /* il radar vero, che si accende quando arriva sullo schermo */
+  .radar-sec { padding-top: 48px; text-align: center; }
+  .radar-sec .intro { margin: 0 auto 44px; }
+  .monitor { position: relative; max-width: 1180px; margin: 0 auto; }
+  .monitor video { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #04080d; }
+  /* Le sfumature delle immagini, una per una, secondo cosa mostrano (--o: 0 sul bordo dello schermo,
+     1 quando l'immagine è ben dentro).
+     Schermi (radar, tutorial): si devono leggere tutti, quindi solo un bordo morbido che si stringe
+     quando arrivano al centro. */
+  .feather {
+    --fx: calc(var(--f0, 12%) - var(--o, 1) * var(--f1, 8%));
+    --fy: calc(var(--fx) * 1.4);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--fx), #000 calc(100% - var(--fx)), transparent 100%), linear-gradient(180deg, transparent 0, #000 var(--fy), #000 calc(100% - var(--fy)), transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image: linear-gradient(90deg, transparent 0, #000 var(--fx), #000 calc(100% - var(--fx)), transparent 100%), linear-gradient(180deg, transparent 0, #000 var(--fy), #000 calc(100% - var(--fy)), transparent 100%);
+    mask-composite: intersect;
+  }
+  .js .monitor .screen { clip-path: inset(49.6% 0 49.6% 0); filter: brightness(2.2) saturate(0.2); transition: clip-path 0.9s var(--ease) 0.15s, filter 1.4s var(--ease) 0.35s; }
+  .js .monitor.on .screen { clip-path: inset(0 0 0 0); filter: none; }
+  .js .monitor::before {
+    /* la riga luminosa del tubo che si accende */
     content: "";
     position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, var(--bg) 0%, rgba(5, 11, 18, 0) 16%, rgba(5, 11, 18, 0) 58%, rgba(5, 11, 18, 0.85) 82%, var(--bg) 100%);
+    left: 6px;
+    right: 6px;
+    top: 50%;
+    height: 2px;
+    background: #bff3ff;
+    transform: scaleX(0);
+    transition: transform 0.45s var(--ease), opacity 0.6s ease 0.5s;
+    z-index: 1;
   }
-  /* il testo sale sul pavimento buio della sala, sotto le postazioni */
+  .js .monitor.on::before { transform: scaleX(1); opacity: 0; }
+  .monitor .live {
+    position: absolute;
+    right: 18px;
+    top: 16px;
+    font: 700 11.5px/1 var(--mono);
+    letter-spacing: 0.08em;
+    color: var(--green);
+    background: rgba(4, 8, 13, 0.8);
+    padding: 6px 8px;
+    border: 1px solid rgba(124, 252, 154, 0.4);
+  }
+  .monitor .live::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--green); }
+  .legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; max-width: 1080px; margin: 34px auto 0; text-align: left; }
+  .legend p { margin: 0; color: var(--muted); font-size: 15.5px; }
+  .legend b { display: block; font: 700 16px/1.3 var(--mono); margin-bottom: 4px; }
+  .c-yellow { color: var(--yellow) !important; }
+  .c-magenta { color: var(--magenta) !important; }
+  .c-green { color: var(--green) !important; }
+
+  /* flat (telefono, movimento ridotto): foto in alto, testo sotto, niente pulviscolo né radio */
+  .flat .hero { display: block; min-height: 0; }
+  .flat .hero-art { bottom: auto; height: 62svh; -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent 100%); mask-image: linear-gradient(180deg, #000 60%, transparent 100%); }
+  .flat .hero-frame { left: 50%; top: 0; bottom: auto; width: 124svh; transform: translate(-64%, 0) !important; -webkit-mask-image: none; mask-image: none; }
+  .flat .shade { background: linear-gradient(180deg, rgba(5, 11, 18, 0.7) 0%, rgba(5, 11, 18, 0) 18%); height: 62svh; }
+  .flat .dust, .flat .radio, .flat .scroll-cue { display: none; }
+  .flat .hero-copy { padding: calc(62svh - 70px) 0 48px; opacity: 1 !important; transform: none !important; }
+
+  /* immagine accanto al testo, che scorre più lenta della pagina */
+  .split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 80px); align-items: center; }
+  .split.flip > :first-child { order: 2; }
+  .art {
+    position: relative;
+    z-index: 0;
+    margin: 0 -14% 0 calc(-1 * max(20px, (100vw - 1160px) / 2));
+    overflow: hidden;
+    aspect-ratio: 4 / 3;
+    -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0, #000 14%, #000 calc(36% + var(--o, 1) * 20%), transparent 100%), linear-gradient(180deg, transparent 0, #000 16%, #000 78%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.35) 0, #000 14%, #000 calc(36% + var(--o, 1) * 20%), transparent 100%), linear-gradient(180deg, transparent 0, #000 16%, #000 78%, transparent 100%);
+    mask-composite: intersect;
+  }
+  .split > div { position: relative; z-index: 1; }
+  .art img { position: absolute; inset: -9% 0; width: 100%; height: 118%; object-fit: cover; object-position: 28% 50%; transform: translateY(calc((var(--p, 0.5) - 0.5) * -12%)); will-change: transform; }
+
+  .facts { margin: 30px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line-soft); }
+  .facts li { display: grid; grid-template-columns: 8.5em minmax(0, 1fr); gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--line-soft); }
+  .facts b { color: var(--green); font-weight: 600; }
+  .facts span { color: var(--muted); }
+
+  /* il tutorial si raddrizza mentre arriva */
+  /* il tutorial esce dal bordo destro, come la controllora da quello sinistro */
+  .tilt { perspective: 1400px; margin: 0 calc(-1 * max(20px, (100vw - 1160px) / 2)) 0 -8%; }
+  .tilt .shot {
+    transform: rotateX(calc((1 - min(var(--p, 1) * 2.2, 1)) * 18deg + var(--rx, 0deg))) rotateY(calc((1 - min(var(--p, 1) * 2.2, 1)) * -10deg + var(--ry, 0deg)));
+    transform-origin: 50% 100%;
+    will-change: transform;
+  }
+  .steps { margin: 22px 0 30px; padding: 0; list-style: none; counter-reset: s; }
+  .steps li { position: relative; padding: 7px 0 7px 36px; color: var(--muted); }
+  .steps li::before { counter-increment: s; content: counter(s); position: absolute; left: 0; top: 7px; font: 700 13px/24px var(--mono); width: 22px; height: 24px; text-align: center; color: var(--green); border: 1px solid rgba(124, 252, 154, 0.4); }
+
+  /* la sala intera: si avvicina con lo scroll */
+  .room { position: relative; padding: 0 0 clamp(80px, 10vw, 140px); }
+  .room-art {
+    position: relative;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 62%, transparent 98%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 14%, #000 62%, transparent 98%);
+  }
+  .room-art img { width: 100%; min-height: 380px; object-fit: cover; object-position: 50% 30%; transform: scale(calc(1.22 - var(--p, 1) * 0.22)); transform-origin: 50% 40%; will-change: transform; }
   .room-copy { position: relative; margin-top: clamp(-150px, -9vw, -40px); text-align: center; }
-  .room-copy h2 { font-family: var(--mono); font-size: clamp(30px, 4.4vw, 54px); color: var(--blue); margin-bottom: 12px; letter-spacing: 0; }
-  .room-copy h2 span { color: var(--green); }
-  .room-copy p { margin: 0 auto 26px; max-width: 36em; color: var(--text); font-size: 17px; }
+  .room-copy h2 { font-size: clamp(32px, 4.6vw, 58px); margin-bottom: 28px; }
+  .room-copy h2 .l2 { display: block; color: var(--green); }
   .room-copy .cta { justify-content: center; }
 
-  /* --- scarica --- */
+  /* --- scarica e sostegno --- */
   .dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 30px; }
   .dl .btn { text-align: left; padding: 16px 20px; }
   .dl .recommended { border-color: var(--green); }
   .dl .recommended::after { content: "il tuo sistema"; display: block; margin-top: 6px; font: 600 11.5px/1 var(--mono); color: var(--green); letter-spacing: 0.04em; }
-  .box { margin-top: 22px; padding: 16px 18px; background: var(--panel); border: 1px solid var(--line-soft); font-size: 14.5px; color: var(--muted); max-width: 62em; }
+  details { margin-top: 18px; font-size: 14.5px; color: var(--muted); max-width: 62em; }
+  summary { cursor: pointer; color: var(--text); width: fit-content; }
+  summary::marker { color: var(--green); }
+  details p { margin: 10px 0 0; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line-soft); }
   code { font-family: var(--mono); font-size: 12.5px; background: var(--field); padding: 1px 5px; }
+  .support { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; margin-top: clamp(56px, 7vw, 88px); padding-top: 32px; border-top: 1px solid var(--line-soft); }
+  .support p { margin: 0; font-size: 18px; }
+  .support p span { color: var(--muted); }
 
-  .support { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; border-top: 1px solid var(--line-soft); padding-top: clamp(56px, 7vw, 88px); }
-  .warn { padding: 16px 18px; background: rgba(255, 184, 77, 0.06); border: 1px solid rgba(255, 184, 77, 0.35); font-size: 14px; color: #ffdba6; }
-  .warn b { color: var(--orange); }
+  /* --- effetti allo scroll e col mouse --- */
+  /* barra in alto: quanta pagina hai già percorso */
+  .progress { position: fixed; left: 0; top: 0; z-index: 50; width: 100%; height: 2px; background: var(--green); transform: scaleX(0); transform-origin: 0 50%; pointer-events: none; }
+  /* sfondo comune a tutta la pagina: la carta dello spazio aereo del simulatore, appena visibile,
+     e la luce fredda dei monitor che resta nell'aria. Scorrono più lenti della pagina */
+  .backdrop { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .backdrop .chart {
+    position: absolute;
+    right: -8vw;
+    top: 50%;
+    height: 150vh;
+    width: auto;
+    max-width: none;
+    opacity: 0.075;
+    transform: translate3d(0, calc(-50% + var(--by, 0px)), 0);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 45%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 45%);
+    will-change: transform;
+  }
+  .backdrop .glow { position: absolute; border-radius: 50%; will-change: transform; }
+  .backdrop .g1 { width: 95vmax; height: 95vmax; left: -30vmax; top: 20vh; background: radial-gradient(closest-side, rgba(40, 125, 165, 0.11), rgba(40, 125, 165, 0)); transform: translate3d(0, var(--g1, 0px), 0); }
+  .backdrop .g2 { width: 80vmax; height: 80vmax; right: -25vmax; top: 60vh; background: radial-gradient(closest-side, rgba(60, 160, 120, 0.07), rgba(60, 160, 120, 0)); transform: translate3d(0, var(--g2, 0px), 0); }
+  .monitor { transform: perspective(1400px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
+  .tilt .shot { position: relative; }
+
+  /* titoli che salgono parola per parola */
+  .js h2[data-reveal] { opacity: 1; transform: none; filter: none; }
+  .js h2[data-reveal] .w {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(0.55em);
+    filter: blur(8px);
+    transition: opacity 0.8s var(--ease), transform 1s var(--ease), filter 0.8s var(--ease);
+    transition-delay: calc(var(--i, 0) * 60ms);
+  }
+  .js h2[data-reveal].in .w { opacity: 1; transform: none; filter: none; }
+
+  /* immagini che si svelano entrando: la finestra si apre e la foto si assesta */
+  .js .art[data-reveal] { transform: none; transition: opacity 0.9s var(--ease), filter 0.9s var(--ease); }
+  .js .art[data-reveal] img { scale: 1.18; transition: scale 1.8s var(--ease); }
+  .js .art[data-reveal].in img { scale: 1; }
 
   /* --- piede --- */
-  footer { padding: 36px 0 52px; border-top: 1px solid var(--line-soft); font-size: 13.5px; color: var(--muted); }
-  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px; }
+  footer { padding: 36px 0 52px; border-top: 1px solid var(--line-soft); font-size: 13px; color: var(--muted); }
+  footer .top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
   footer nav { display: flex; flex-wrap: wrap; gap: 18px; }
-  footer p { margin: 0 0 6px; max-width: 520px; }
   footer .brand { font-size: 13px; letter-spacing: 0.14em; }
+  footer .legal { margin: 0; max-width: 72em; font-size: 12.5px; line-height: 1.55; }
 
   @media (max-width: 900px) {
-    .screen-head, .split, .support { grid-template-columns: 1fr; }
+    .split, .legend { grid-template-columns: 1fr; }
+    .legend { gap: 16px; }
     .split.flip > :first-child { order: 0; }
-    .legend { grid-template-columns: 1fr; }
+    .tilt { margin: 0; }
+    .art {
+      margin: 0 -20px;
+      -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 10%, #000 68%, transparent 100%);
+      mask-image: linear-gradient(180deg, transparent 0, #000 10%, #000 68%, transparent 100%);
+    }
     .dl { grid-template-columns: 1fr; }
-    .tag { display: none; }
   }
   @media (max-width: 700px) {
-    /* su telefono l'illustrazione sta in alto, con le due persone in vista, e il testo sotto */
-    .hero { --h: 62svh; min-height: 0; display: block; }
-    .hero-art { bottom: auto; height: var(--h); }
-    .hero-frame { left: 50%; top: 0; transform: translate(-56%, 0); -webkit-mask-image: none; mask-image: none; }
-    .hero-art::after { background: linear-gradient(180deg, rgba(5, 11, 18, 0.7) 0%, rgba(5, 11, 18, 0) 18%, rgba(5, 11, 18, 0) 62%, var(--bg) 100%); }
-    .hero-copy { padding: calc(var(--h) - 70px) 0 48px; }
     .hero h1 { font-size: 30px; }
     .bar nav a:not(:last-child) { display: none; }
+    .monitor .live { top: 12px; right: 12px; font-size: 11px; padding: 4px 6px; letter-spacing: 0.04em; }
     .facts li { grid-template-columns: 1fr; gap: 2px; }
   }
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .hero-frame img, .tag .block { animation: none !important; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .js [data-reveal] { opacity: 1; transform: none; filter: none; }
+    .js .hero h1 span { clip-path: none; }
+    .js .monitor .screen { clip-path: none; filter: none; }
+    .room-art img, .tilt .shot { transform: none; }
+    .js h2[data-reveal] .w { opacity: 1; transform: none; filter: none; }
+    .js .art[data-reveal] img { scale: 1; }
   }
 </style>
 </head>
 <body>
+<div class="progress" aria-hidden="true"></div>
+<div class="backdrop" aria-hidden="true"><img class="chart" src="img/carta.svg" alt="" width="789" height="830" /><span class="glow g1"></span><span class="glow g2"></span></div>
 
 <header class="bar">
   <div class="wrap">
     <a class="brand" href="#">ACS SIMULATOR</a>
     <nav>
-      <a href="#cosa">Cos'è</a>
+      <a href="#radar">Il radar</a>
       <a href="#tutorial">Tutorial</a>
       <a href="#scarica">Scarica</a>
       <a href="https://github.com/acs-simulator/acs-simulator">Progetto</a>
@@ -297,68 +448,62 @@
 </header>
 
 <main>
-  <div class="hero">
+  <section class="hero" id="hero" aria-label="La sala radar">
     <div class="hero-art">
       <div class="hero-frame">
-        <img src="img/sala-turno.jpg" width="2400" height="1250" alt="Illustrazione: due controllori di spalle, con le cuffie, davanti ai monitor del radar in una sala buia. Lei indica una traccia sullo schermo del collega." />
-        <button class="tag" type="button" id="tag" aria-label="Volo ITY2147 a livello 360, passato al tuo settore: clic per prenderlo in carico">
-          <span class="leader"></span>
-          <span class="hint">Clic sul tag: prendilo in carico</span>
-          <span class="block">ITY2147<i>360 ↓340</i></span>
-        </button>
+        <img src="img/foto-turno.webp" width="1774" height="887" alt="Due controllori di spalle, con le cuffie, davanti ai monitor del radar in una sala buia: lei indica un volo sullo schermo, lui ascolta la frequenza con la mano sulla cuffia." />
       </div>
+      <canvas class="dust" aria-hidden="true"></canvas>
+      <div class="shade"></div>
     </div>
-    <div class="wrap">
+    <div class="wrap hero-copy-wrap">
       <div class="hero-copy">
-        <h1>Controlla il cielo<br /><span>da una sala radar</span></h1>
-        <p class="lead">
-          Un simulatore gratuito di <b>controllo del traffico aereo d'area</b>, con i settori reali di
-          Roma ACC e Milano ACC. Prendi in carico i voli, tienili separati, consegnali al settore successivo.
-        </p>
-        <div class="cta">
-          <a class="btn primary big" href="play/" id="play">Gioca ora nel browser<small>nessuna installazione</small></a>
-          <a class="btn big" href="#scarica" id="download">Scarica per il computer<small id="download-os">macOS · Windows · Linux</small></a>
+        <h1><span>Controlla il cielo</span><span>da una sala radar</span></h1>
+        <p class="lead" data-reveal style="--d: 6">Il simulatore gratuito di controllo del traffico aereo, sui settori veri di Roma e Milano.</p>
+        <div class="cta" data-reveal style="--d: 8">
+          <a class="btn primary big" href="play/" id="play">Gioca ora<small>nel browser, senza installare</small></a>
+          <a class="btn big" href="#scarica" id="download">Scarica<small id="download-os">macOS · Windows · Linux</small></a>
         </div>
-        <p class="note">Gratis, senza account. Serve un computer con mouse o trackpad e uno schermo di almeno 1100×700.</p>
+        <p class="note" data-reveal style="--d: 9">Gratis, senza account. Si gioca da computer, con mouse o trackpad.</p>
       </div>
     </div>
-  </div>
+    <div class="radio" aria-hidden="true"><span class="head">IN FREQUENZA · ROMA RADAR</span><p></p><p></p><p></p></div>
+    <span class="scroll-cue" aria-hidden="true"></span>
+  </section>
 
-  <section class="screen-sec" id="radar">
+  <section class="radar-sec" id="radar">
     <div class="wrap">
-      <div class="screen-head">
-        <h2>Questo è il tuo schermo. <span class="mono">Ogni puntino è un volo.</span></h2>
-        <p class="intro">
-          Il radar è lo stesso dei controllori d'area: il confine del settore, i punti di riporto, le zone riservate
-          e accanto a ogni traccia il suo tag, con nominativo e livello. Il colore ti dice di chi è.
-        </p>
+      <h2 class="mono" data-reveal>Ogni puntino è un volo.</h2>
+      <p class="intro" data-reveal style="--d: 1">Il colore del tag ti dice di chi è.</p>
+      <div class="monitor" id="monitor" data-scroll>
+        <div class="screen feather" style="--f0: 10%; --f1: 7%">
+          <video id="radar-video" muted loop playsinline preload="none" poster="img/radar-video.jpg" width="2260" height="1640" aria-label="Il radar di ACS Simulator in movimento: i voli avanzano sul settore NW Alto di Roma ACC; un volo magenta viene preso in carico e diventa verde">
+            <source src="img/radar.webm" type="video/webm" />
+          </video>
+        </div>
+        <span class="live">SIMULAZIONE · 8×</span>
       </div>
-      <div class="shot"><img src="img/radar.jpg" width="1470" height="820" loading="lazy" alt="Il radar di ACS Simulator durante una sessione: tracce verdi, gialle e magenta sul settore NW Alto di Roma ACC" /></div>
-      <dl class="legend">
-        <div><dt class="c-yellow">Giallo<i>BAW1857 390</i></dt><dd>Non è tuo. Lo vedi perché passa vicino, ma lo controlla qualcun altro.</dd></div>
-        <div><dt class="c-magenta">Magenta<i>VOE860 380</i></dt><dd>Il settore precedente te lo ha passato e aspetta che tu lo prenda in carico.</dd></div>
-        <div><dt class="c-green">Verde<i>RYR6944 390</i></dt><dd>È in contatto con te. Solo a questi puoi dare istruzioni.</dd></div>
-      </dl>
+      <div class="legend">
+        <p data-reveal><b class="c-yellow">Giallo</b>Di un altro settore. Passa vicino, ma non è tuo.</p>
+        <p data-reveal style="--d: 1"><b class="c-magenta">Magenta</b>Te lo stanno passando. Un clic e lo prendi.</p>
+        <p data-reveal style="--d: 2"><b class="c-green">Verde</b>È tuo. Solo a lui puoi dare istruzioni.</p>
+      </div>
     </div>
   </section>
 
   <section id="cosa">
     <div class="wrap split">
-      <figure class="art" style="margin: 0">
-        <img src="img/sala-ascolto.jpg" width="1800" height="1200" loading="lazy" alt="Illustrazione: una controllora di spalle, con la mano sulla cuffia, ascolta la frequenza davanti a un grande schermo radar." />
+      <figure class="art" data-scroll data-reveal>
+        <img src="img/foto-ascolto.webp" width="1774" height="887" loading="lazy" alt="Una controllora di spalle, capelli raccolti e mano sulla cuffia, ascolta la frequenza davanti a un grande schermo radar." />
       </figure>
       <div>
-        <h2>Non si fanno atterrare gli aerei. Si tengono lontani l'uno dall'altro.</h2>
-        <p class="intro">
-          Il controllore d'area segue i voli in rotta, da una sala senza finestre. Il tuo compito è prendere in carico
-          gli aerei che entrano nel tuo settore, mantenere <b>5 miglia o 1000 piedi</b> fra l'uno e l'altro, e passarli
-          al settore successivo nel punto e al livello concordati. Nel frattempo il mondo non sta fermo.
-        </p>
+        <h2 data-reveal>Cinque miglia o mille piedi. Mai meno.</h2>
+        <p class="intro" data-reveal style="--d: 1">Prendi i voli che entrano nel tuo settore, tienili separati, passali al settore successivo. Intanto il mondo non sta fermo.</p>
         <ul class="facts">
-          <li><b>Settori veri</b><span>Roma ACC su tre strati, dalla Toscana alla Sicilia, e Milano ACC: punti FRA, rotte, procedure e zone riservate ricostruiti su dati reali.</span></li>
-          <li><b>Traffico che si comporta</b><span>Voli su flussi veri fra aeroporti, profili di salita e discesa calcolati sulle prestazioni di ogni aeromobile, semicircolare italiana compresa.</span></li>
-          <li><b>Imprevisti</b><span>Temporali da aggirare, zone militari che si attivano, richieste di livello, turbolenza, avarie radio, MAYDAY.</span></li>
-          <li><b>Difficoltà a scelta</b><span>Da cinque a dieci voli in contatto insieme, con conflitti costruiti su misura e un tempo di reazione che si accorcia.</span></li>
+          <li data-reveal style="--d: 2"><b>Settori veri</b><span>Roma ACC e Milano ACC, ricostruiti su dati reali.</span></li>
+          <li data-reveal style="--d: 3"><b>Traffico vero</b><span>Flussi fra aeroporti, salite e discese per ogni aereo.</span></li>
+          <li data-reveal style="--d: 4"><b>Imprevisti</b><span>Temporali, zone militari, avarie radio, MAYDAY.</span></li>
+          <li data-reveal style="--d: 5"><b>Difficoltà</b><span>Da cinque a dieci voli in contatto insieme.</span></li>
         </ul>
       </div>
     </div>
@@ -366,55 +511,49 @@
 
   <section id="tutorial">
     <div class="wrap split flip">
-      <div class="shot"><img src="img/tutorial.jpg" width="1470" height="820" loading="lazy" alt="Il riquadro dell'istruttore durante la prima lezione del tutorial" /></div>
+      <div class="tilt" data-scroll><div class="shot feather" data-tilt="6" style="--f0: 12%; --f1: 8%"><img src="img/tutorial.jpg" width="1470" height="820" loading="lazy" alt="Il riquadro dell'istruttore durante la prima lezione del tutorial" /></div></div>
       <div>
-        <h2>Dieci lezioni, da zero a un turno completo.</h2>
-        <p class="intro">Il tutorial guidato non è un filmato: si controlla davvero, sulla simulazione vera. Ogni lezione prepara la situazione che serve e ti segue passo per passo, e nessun errore chiude la partita finché sei lì dentro.</p>
+        <h2 data-reveal>Dieci lezioni, da zero a un turno completo.</h2>
+        <p class="intro" data-reveal style="--d: 1">Non è un filmato: si controlla davvero, passo per passo.</p>
         <ol class="steps">
-          <li>Il radar e il settore, le tracce, i colori</li>
-          <li>Prendere in carico, dare istruzioni, passare i voli</li>
-          <li>Separazione e conflitti, zone attive, meteo</li>
-          <li>Emergenze e un turno di prova</li>
+          <li data-reveal style="--d: 2">Il radar, il settore, i colori</li>
+          <li data-reveal style="--d: 3">Prendere, istruire, passare i voli</li>
+          <li data-reveal style="--d: 4">Conflitti, zone attive, meteo</li>
+          <li data-reveal style="--d: 5">Emergenze e un turno di prova</li>
         </ol>
-        <a class="btn primary" href="play/">Prova la prima lezione</a>
+        <a class="btn primary" href="play/" data-reveal style="--d: 6">Prova la prima lezione</a>
       </div>
     </div>
   </section>
 
   <section class="room" aria-labelledby="room-title">
-    <div class="room-art"><img src="img/sala-sala.jpg" width="2400" height="900" loading="lazy" alt="Illustrazione: una sala controllo vista dal fondo, file di postazioni con i radar accesi, controllori seduti e un supervisore in piedi fra le file." /></div>
+    <div class="room-art" data-scroll><img src="img/foto-sala.webp" width="1774" height="887" loading="lazy" alt="Una sala controllo vista dal fondo: file di postazioni con i radar accesi, controllori seduti con le cuffie, un supervisore in piedi davanti al grande schermo sulla parete." /></div>
     <div class="room-copy wrap">
-      <h2 id="room-title">Il turno comincia<br /><span>quando vuoi tu.</span></h2>
-      <p>Scegli Roma o Milano, scegli il settore e il traffico. In un paio di minuti hai il primo volo magenta che aspetta te.</p>
-      <div class="cta">
-        <a class="btn primary big" href="play/">Gioca ora nel browser</a>
-        <a class="btn big" href="#scarica">Scarica il programma</a>
+      <h2 class="mono" id="room-title" data-reveal>Il turno comincia<span class="l2">quando vuoi tu.</span></h2>
+      <div class="cta" data-reveal style="--d: 1">
+        <a class="btn primary big" href="play/">Gioca ora</a>
+        <a class="btn big" href="#scarica">Scarica</a>
       </div>
     </div>
   </section>
 
   <section id="scarica">
     <div class="wrap">
-      <h2>Il programma completo, per il tuo computer.</h2>
-      <p class="intro">La versione da scaricare è la stessa che si gioca nel browser, in una finestra tutta sua. Funziona senza connessione, non chiede account e non raccoglie dati.</p>
+      <h2 data-reveal>Oppure scaricalo.</h2>
+      <p class="intro" data-reveal style="--d: 1">Lo stesso simulatore, in una finestra sua. Funziona anche senza internet.</p>
       <div class="dl">
-        <a class="btn" data-os="mac" href="https://github.com/acs-simulator/acs-simulator/releases/latest">macOS<small>Apple Silicon e Intel · .dmg</small></a>
-        <a class="btn" data-os="win" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Windows<small>10 o successivo · installer .exe</small></a>
-        <a class="btn" data-os="linux" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Linux<small>.AppImage e .deb</small></a>
+        <a class="btn" data-reveal style="--d: 2" data-os="mac" href="https://github.com/acs-simulator/acs-simulator/releases/latest">macOS<small>Apple Silicon e Intel · .dmg</small></a>
+        <a class="btn" data-reveal style="--d: 3" data-os="win" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Windows<small>10 o successivo · .exe</small></a>
+        <a class="btn" data-reveal style="--d: 4" data-os="linux" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Linux<small>.AppImage e .deb</small></a>
       </div>
-      <div class="box">
-        <b>Al primo avvio</b> il sistema avverte che l'autore non è verificato: il programma non è firmato con un certificato a pagamento.
-        Su <b>macOS</b> apri con <b>clic destro → Apri</b>; su <b>Windows</b> scegli <b>Ulteriori informazioni → Esegui comunque</b>.
-        Le istruzioni complete sono nella <a href="https://github.com/acs-simulator/acs-simulator#al-primo-avvio">pagina del progetto</a>.
-      </div>
+      <details>
+        <summary>Al primo avvio compare un avviso di sicurezza?</summary>
+        <p>È normale: il programma non è firmato con un certificato a pagamento. Su <b>macOS</b> apri con <b>clic destro → Apri</b>; su <b>Windows</b> scegli <b>Ulteriori informazioni → Esegui comunque</b>. Le istruzioni complete sono nella <a href="https://github.com/acs-simulator/acs-simulator#al-primo-avvio">pagina del progetto</a>.</p>
+      </details>
 
       <div class="support" id="sostegno">
-        <div>
-          <h2>Gratuito, e resterà così.</h2>
-          <p class="intro">ACS Simulator è un progetto indipendente, scritto nel tempo libero. Se ti diverte, offrire un caffè è il modo più diretto per aiutarlo a crescere: nuovi settori, più procedure, altre lezioni.</p>
-          <p style="margin-top: 24px"><a class="btn donate" href="https://www.buymeacoffee.com/acssimulator">Offrimi un caffè</a></p>
-        </div>
-        <div class="warn"><b>Nessun valore operativo.</b> ACS Simulator è una simulazione didattica e ricreativa. I dati aeronautici sono una ricostruzione parziale, non aggiornata agli ultimi cicli AIRAC, e non rappresentano le procedure in vigore: non possono essere usati per la navigazione aerea né per l'addestramento professionale. Non è prodotto, approvato né sostenuto da ENAV S.p.A., da IVAO o da VATSIM. Le persone e le sale nelle illustrazioni sono immaginarie.</div>
+        <p>Gratuito, e resterà così. <span>Se ti diverte, offrimi un caffè.</span></p>
+        <a class="btn donate" href="https://www.buymeacoffee.com/acssimulator">Offrimi un caffè</a>
       </div>
     </div>
   </section>
@@ -422,16 +561,16 @@
 
 <footer>
   <div class="wrap">
-    <div>
-      <p><span class="brand">ACS SIMULATOR</span></p>
-      <p>Area Control Simulator · © 2026 ACS Simulator, tutti i diritti riservati. Gratuito per uso personale.</p>
+    <div class="top">
+      <span class="brand">ACS SIMULATOR</span>
+      <nav>
+        <a href="https://github.com/acs-simulator/acs-simulator">Progetto</a>
+        <a href="https://github.com/acs-simulator/acs-simulator/issues">Segnala un problema</a>
+        <a href="https://github.com/acs-simulator/acs-simulator/blob/main/CREDITI.md">Fonti dei dati e crediti</a>
+        <a href="https://github.com/acs-simulator/acs-simulator/blob/main/LICENSE">Licenza</a>
+      </nav>
     </div>
-    <nav>
-      <a href="https://github.com/acs-simulator/acs-simulator">Progetto</a>
-      <a href="https://github.com/acs-simulator/acs-simulator/issues">Segnala un problema</a>
-      <a href="https://github.com/acs-simulator/acs-simulator/blob/main/CREDITI.md">Fonti dei dati e crediti</a>
-      <a href="https://github.com/acs-simulator/acs-simulator/blob/main/LICENSE">Licenza</a>
-    </nav>
+    <p class="legal">© 2026 ACS Simulator · Gratuito per uso personale. Simulazione didattica e ricreativa, senza valore operativo: i dati aeronautici sono una ricostruzione parziale e non aggiornata, da non usare per la navigazione né per l'addestramento professionale. Non è prodotto, approvato né sostenuto da ENAV S.p.A., IVAO o VATSIM. Le foto della sala sono generate al computer: persone e luoghi non esistono.</p>
   </div>
 </footer>
 
@@ -443,7 +582,7 @@
     var names = { mac: 'macOS', win: 'Windows', linux: 'Linux' };
     // su telefono o schermo stretto il radar non è utilizzabile: meglio dirlo prima del clic
     if (window.matchMedia('(max-width: 1000px), (pointer: coarse)').matches) {
-      document.querySelector('#play small').textContent = 'da un computer, con mouse o trackpad';
+      document.querySelector('#play small').textContent = 'da un computer, con il mouse';
     }
     if (!os) return;
     var btn = document.querySelector('[data-os="' + os + '"]');
@@ -451,15 +590,303 @@
     document.getElementById('download-os').textContent = 'per ' + names[os];
   })();
 
-  // il tag sull'illustrazione: un clic fa l'hand-on, come nel simulatore
+  // --- movimento ---------------------------------------------------------------------------------
   (function () {
-    var tag = document.getElementById('tag');
-    tag.addEventListener('click', function () {
-      if (tag.classList.contains('taken')) return;
-      tag.classList.add('taken');
-      tag.querySelector('.hint').textContent = 'In contatto. Ora è tuo.';
-      tag.setAttribute('aria-label', 'Volo ITY2147 in contatto con te');
+    var root = document.documentElement;
+    var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var clamp = function (x) { return x < 0 ? 0 : x > 1 ? 1 : x; };
+
+    // i titoli si spezzano in parole, che poi salgono una alla volta
+    document.querySelectorAll('h2[data-reveal]').forEach(function (h) {
+      var i = 0;
+      (function split(node) {
+        [].slice.call(node.childNodes).forEach(function (c) {
+          if (c.nodeType === 1) { split(c); return; }
+          if (c.nodeType !== 3) return;
+          var frag = document.createDocumentFragment();
+          c.textContent.split(/(\s+)/).forEach(function (part) {
+            if (!part) return;
+            if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(part)); return; }
+            var w = document.createElement('span');
+            w.className = 'w';
+            w.style.setProperty('--i', i++);
+            w.textContent = part;
+            frag.appendChild(w);
+          });
+          node.replaceChild(frag, c);
+        });
+      })(h);
     });
+
+    // comparsa allo scroll: una volta sola, appena l'elemento entra
+    var reveals = document.querySelectorAll('[data-reveal]');
+    if (!('IntersectionObserver' in window) || still) {
+      reveals.forEach(function (el) { el.classList.add('in'); });
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+        });
+      }, { rootMargin: '0px 0px -12% 0px' });
+      reveals.forEach(function (el) { io.observe(el); });
+    }
+
+    // scorrimento morbido (Lenis, se è arrivato dalla rete e il movimento non è ridotto)
+    var lenis = null;
+    window.addEventListener('load', function () {
+      if (still || !window.Lenis) return;
+      lenis = new window.Lenis({ lerp: 0.085, wheelMultiplier: 0.9 });
+      var raf = function (t) { lenis.raf(t); requestAnimationFrame(raf); };
+      requestAnimationFrame(raf);
+    });
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href^="#"]');
+      if (!a || !lenis) return;
+      var id = a.getAttribute('href').slice(1);
+      var target = id ? document.getElementById(id) : 0;
+      if (id && !target) return;
+      e.preventDefault();
+      lenis.scrollTo(target || 0, { duration: 1.6 });
+    });
+
+    // parallasse delle immagini più in basso: --p va da 0 a 1 mentre l'elemento attraversa lo schermo
+    var scrolled = document.querySelectorAll('[data-scroll]');
+    var backdrop = document.querySelector('.backdrop');
+    function updateScrolled() {
+      var vh = window.innerHeight;
+      var y = window.scrollY;
+      backdrop.style.setProperty('--by', (-y * 0.035).toFixed(1) + 'px');
+      backdrop.style.setProperty('--g1', (-y * 0.08).toFixed(1) + 'px');
+      backdrop.style.setProperty('--g2', (-y * 0.13).toFixed(1) + 'px');
+      scrolled.forEach(function (el) {
+        var r = el.getBoundingClientRect();
+        if (r.bottom < -100 || r.top > vh + 100) return;
+        var p = clamp((vh - r.top) / (vh + r.height));
+        el.style.setProperty('--p', p.toFixed(4));
+        // apertura: 0 quando l'elemento è sul bordo dello schermo, 1 quando è ben dentro
+        var o = clamp(Math.min(p, 1 - p) / 0.32);
+        el.style.setProperty('--o', (o * o * (3 - 2 * o)).toFixed(4));
+      });
+    }
+    if (!still) {
+      window.addEventListener('scroll', function () { requestAnimationFrame(updateScrolled); }, { passive: true });
+      window.addEventListener('resize', updateScrolled);
+      updateScrolled();
+    }
+
+    // --- il radar: si accende quando arriva sullo schermo, e il video gira solo finché si vede ------
+    var monitor = document.getElementById('monitor');
+    var video = document.getElementById('radar-video');
+    var radarSeen = false;
+    function syncVideo() {
+      if (radarSeen && !document.hidden) {
+        video.preload = 'auto';
+        var pr = video.play();
+        if (pr && pr.catch) pr.catch(function () {});
+      } else if (!video.paused) {
+        video.pause();
+      }
+    }
+    if (!('IntersectionObserver' in window)) {
+      monitor.classList.add('on');
+    } else {
+      new IntersectionObserver(function (entries) {
+        radarSeen = entries[0].isIntersecting;
+        if (radarSeen) monitor.classList.add('on');
+        syncVideo();
+      }, { threshold: 0.35 }).observe(monitor);
+    }
+    document.addEventListener('visibilitychange', syncVideo);
+
+    // --- la testata: profondità col mouse, pulviscolo, frequenza radio -----------------------------
+    var hero = document.getElementById('hero');
+    var frame = hero.querySelector('.hero-frame');
+    var copy = hero.querySelector('.hero-copy');
+    var cue = hero.querySelector('.scroll-cue');
+    var radio = hero.querySelector('.radio');
+    var canvas = hero.querySelector('.dust');
+    var ctx = canvas.getContext('2d');
+    var flat = function () { return root.classList.contains('flat'); };
+
+    // pulviscolo: più fitto e più chiaro verso i monitor, a destra
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var motes = [];
+    function sizeDust() {
+      var w = canvas.clientWidth, h = canvas.clientHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      var n = Math.round(Math.min(140, (w * h) / 9000));
+      motes = [];
+      for (var i = 0; i < n; i++) {
+        motes.push({
+          x: w * (0.38 + 0.62 * Math.pow(Math.random(), 0.8)),
+          y: Math.random() * h,
+          r: 0.4 + Math.random() * 1.6,
+          vy: -(0.04 + Math.random() * 0.22),
+          ph: Math.random() * Math.PI * 2,
+          a: 0.15 + Math.random() * 0.55,
+          z: 0.4 + Math.random() * 1.2,
+        });
+      }
+    }
+    function drawDust(t, mx, my, sy) {
+      var w = canvas.clientWidth, h = canvas.clientHeight;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'lighter';
+      for (var i = 0; i < motes.length; i++) {
+        var m = motes[i];
+        m.y += m.vy * m.z;
+        m.x += Math.sin(t / 2400 + m.ph) * 0.08 * m.z;
+        if (m.y < -10) { m.y = h + 10; m.x = w * (0.38 + 0.62 * Math.pow(Math.random(), 0.8)); }
+        // i granelli più vicini si spostano di più: col mouse e con lo scroll
+        var x = m.x - mx * 26 * m.z, y = m.y - my * 16 * m.z - sy * 0.25 * m.z;
+        var tw = 0.6 + 0.4 * Math.sin(t / 900 + m.ph * 3);
+        ctx.fillStyle = 'rgba(170, 230, 255,' + (m.a * tw * (x / w)).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(x, y, m.r * m.z, 0, 6.2832);
+        ctx.fill();
+      }
+    }
+
+    // la frequenza: battute radio scritte mentre "si dicono"
+    var lines = [
+      ['pilot', 'WZZ1229', 'Roma, Wizz Air one two two niner, flight level three six zero.'],
+      ['atc', 'ROMA', 'Wizz Air one two two niner, Roma radar, identified.'],
+      ['pilot', 'RYR2495', 'Request climb flight level three eight zero.'],
+      ['atc', 'ROMA', 'Ryanair two four niner five, climb flight level three eight zero.'],
+      ['pilot', 'RYR2495', 'Climb flight level three eight zero, Ryanair two four niner five.'],
+      ['atc', 'ROMA', 'Air Serbia one six three five, contact Padova radar, good day.'],
+    ];
+    var rows = radio.querySelectorAll('p');
+    var li = 0, typing = null, radioOn = false;
+    function nextLine() {
+      if (!radioOn) { typing = null; return; }
+      for (var i = 0; i < rows.length - 1; i++) {
+        rows[i].innerHTML = rows[i + 1].innerHTML;
+        rows[i].className = rows[i + 1].innerHTML ? 'old' : '';
+      }
+      var row = rows[rows.length - 1];
+      var l = lines[li++ % lines.length];
+      row.className = 'typing';
+      row.innerHTML = '<span class="who ' + l[0] + '">' + l[1] + '</span><span class="said"></span>';
+      var said = row.querySelector('.said');
+      var k = 0;
+      (function type() {
+        if (!radioOn) { typing = null; return; }
+        said.textContent = l[2].slice(0, ++k);
+        if (k < l[2].length) typing = setTimeout(type, 26 + Math.random() * 30);
+        else { row.className = ''; typing = setTimeout(nextLine, 1500); }
+      })();
+    }
+    function setRadio(on) {
+      if (on === radioOn) return;
+      radioOn = on;
+      if (on && !typing) typing = setTimeout(nextLine, 900);
+    }
+
+    // il mouse sposta di poco i piani: la foto, il pulviscolo più vicino, il testo davanti
+    var mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+    window.addEventListener('pointermove', function (e) {
+      if (e.pointerType !== 'mouse') return;
+      mouse.tx = e.clientX / window.innerWidth - 0.5;
+      mouse.ty = e.clientY / window.innerHeight - 0.5;
+    }, { passive: true });
+
+    var running = false, inView = true;
+    function apply(t, animate) {
+      if (animate) {
+        mouse.x += (mouse.tx - mouse.x) * 0.06;
+        mouse.y += (mouse.ty - mouse.y) * 0.06;
+      }
+      var sy = Math.max(0, window.scrollY);
+      // la foto scorre più lenta della pagina, il testo un po' più veloce e sfuma
+      frame.style.transform = 'translate3d(' + (-mouse.x * 18).toFixed(2) + 'px,' + (sy * 0.32 - mouse.y * 12).toFixed(2) + 'px,0)';
+      copy.style.opacity = Math.max(0, 1 - sy / 560).toFixed(3);
+      copy.style.transform = 'translate3d(' + (mouse.x * 8).toFixed(2) + 'px,' + (-sy * 0.12).toFixed(1) + 'px,0)';
+      cue.style.opacity = Math.max(0, 0.8 - sy / 200).toFixed(3);
+      radio.style.opacity = Math.max(0, 1 - sy / 320).toFixed(3);
+      setRadio(sy < window.innerHeight * 0.4 && !document.hidden);
+      if (animate) drawDust(t, mouse.x, mouse.y, sy);
+    }
+    function tick(t) {
+      if (!running) return;
+      requestAnimationFrame(tick);
+      apply(t, true);
+    }
+    window.addEventListener('scroll', function () { if (running) apply(performance.now(), false); }, { passive: true });
+    function start() {
+      if (running || flat() || still || !inView) return;
+      running = true;
+      requestAnimationFrame(tick);
+    }
+    function stop() {
+      running = false;
+      setRadio(false);
+    }
+    // in versione flat si tolgono i valori scritti dallo script e il CSS fa il resto
+    function clearInline() {
+      [frame, copy, cue, radio].forEach(function (el) { el.style.transform = el.style.opacity = ''; });
+    }
+    new IntersectionObserver(function (entries) {
+      inView = entries[0].isIntersecting;
+      if (inView) start(); else stop();
+    }).observe(hero);
+    function layout() {
+      if (flat() || still) { stop(); clearInline(); return; }
+      sizeDust();
+      start();
+    }
+    window.addEventListener('resize', layout);
+    window.matchMedia('(max-width: 700px)').addEventListener('change', layout);
+    document.addEventListener('visibilitychange', function () { if (document.hidden) setRadio(false); });
+    layout();
+
+    // --- barra di avanzamento -----------------------------------------------------------------------
+    var bar = document.querySelector('.progress');
+    function updateBar() {
+      var h = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.transform = 'scaleX(' + (h > 0 ? clamp(window.scrollY / h) : 0).toFixed(4) + ')';
+    }
+    window.addEventListener('scroll', updateBar, { passive: true });
+    window.addEventListener('resize', updateBar);
+    updateBar();
+
+    // --- col mouse: immagini che si inclinano, pulsanti che si avvicinano -----------------------------
+    var fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (fine && !still) {
+      var tilts = [].slice.call(document.querySelectorAll('[data-tilt]')).map(function (el) {
+        var o = { el: el, rx: 0, ry: 0, tx: 0, ty: 0, max: parseFloat(el.dataset.tilt) || 0 };
+        el.addEventListener('pointermove', function (e) {
+          var r = el.getBoundingClientRect();
+          o.tx = (0.5 - (e.clientY - r.top) / r.height) * o.max;
+          o.ty = ((e.clientX - r.left) / r.width - 0.5) * o.max;
+        });
+        el.addEventListener('pointerleave', function () { o.tx = o.ty = 0; });
+        return o;
+      });
+
+      (function loop() {
+        requestAnimationFrame(loop);
+        tilts.forEach(function (o) {
+          var dx = o.tx - o.rx, dy = o.ty - o.ry;
+          if (Math.abs(dx) < 0.005 && Math.abs(dy) < 0.005) return;
+          o.rx += dx * 0.1;
+          o.ry += dy * 0.1;
+          o.el.style.setProperty('--rx', o.rx.toFixed(3) + 'deg');
+          o.el.style.setProperty('--ry', o.ry.toFixed(3) + 'deg');
+        });
+      })();
+
+      // i pulsanti principali si spostano di poco verso il cursore
+      document.querySelectorAll('.btn.big, .btn.primary').forEach(function (b) {
+        b.addEventListener('pointermove', function (e) {
+          var r = b.getBoundingClientRect();
+          b.style.translate = ((e.clientX - r.left - r.width / 2) * 0.16).toFixed(1) + 'px ' + ((e.clientY - r.top - r.height / 2) * 0.3).toFixed(1) + 'px';
+        });
+        b.addEventListener('pointerleave', function () { b.style.translate = ''; });
+      });
+    }
   })();
 </script>
 </body>
