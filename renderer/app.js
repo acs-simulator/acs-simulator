@@ -18,7 +18,7 @@ import { WEATHER_DEFAULT } from './weather.js';
 import { COASTLINE, ACC_BOUNDARIES } from './data/chart.js';
 import { soundSpeedKt, MACH_FROM_FT } from './performance.js';
 import { makeProjection, distance } from './geo.js';
-import { Tutorial, LESSONS, loadProgress, fillBackground } from './tutorial.js';
+import { Tutorial, LESSONS, loadProgress, resumePoint, fillBackground } from './tutorial.js';
 import {
   APP_NAME, TAGLINE, CONTACT, ABOUT, DISCLAIMER, SOURCES, PROJECT_URL, ISSUES_URL, donateUrl, openExternal,
   appVersion,
@@ -45,6 +45,9 @@ function resizeCanvas() {
   drawStartMap();
 }
 window.addEventListener('resize', resizeCanvas);
+// la mappa della schermata iniziale si ridisegna a ogni cambio di dimensione: aprendo le regole il
+// riquadro si accorcia, e un disegno vecchio verrebbe solo schiacciato
+if (window.ResizeObserver) new ResizeObserver(() => drawStartMap()).observe($('start-map'));
 
 const fmtTime = (s) => {
   const total = Math.floor(s);
@@ -612,13 +615,16 @@ function renderTutorialCta() {
   $('tutorial-cta-sub').textContent = n === 0
     ? 'Dieci lezioni: dal primo volo al turno completo'
     : n >= LESSONS.length ? 'Completato · ripassa quando vuoi' : `${n} lezioni su ${LESSONS.length}`;
-  $('tutorial-cta-go').textContent = n === 0 ? 'Inizia ▸' : n >= LESSONS.length ? 'Rivedi ▸' : 'Continua ▸';
+  const resume = resumePoint(p);
+  if (resume) $('tutorial-cta-sub').textContent = `Lezione ${resume.index + 1}, passo ${resume.step + 1} di ${resume.of}`;
+  $('tutorial-cta-go').textContent = resume ? 'Riprendi ▸' : n === 0 ? 'Inizia ▸' : n >= LESSONS.length ? 'Rivedi ▸' : 'Continua ▸';
   $('tutorial-cta').classList.toggle('fresh', n === 0);
 }
 
 function renderLessonList() {
   const p = tutorialProgress();
   const list = $('lesson-list');
+  const resume = resumePoint(p);
   list.innerHTML = '';
   LESSONS.forEach((l, i) => {
     const done = p.done.includes(l.id);
@@ -630,16 +636,19 @@ function renderLessonList() {
       <span class="lesson-main"><strong></strong><span class="muted"></span></span>
       <span class="lesson-stars">${[1, 2, 3].map((k) => `<i class="${k <= stars ? 'on' : ''}">★</i>`).join('')}</span>`;
     row.querySelector('strong').textContent = l.title;
-    row.querySelector('.muted').textContent = l.subtitle;
+    row.querySelector('.muted').textContent = resume?.index === i
+      ? `In corso: passo ${resume.step + 1} di ${resume.of} · ${l.subtitle}`
+      : l.subtitle;
     row.addEventListener('click', () => startTutorialLesson(i));
     list.appendChild(row);
   });
   $('tutorial-progress').textContent = `${p.done.length} di ${LESSONS.length} completate · settore NW ALTO di Roma ACC`;
-  // il pulsante grande porta alla prima lezione non ancora fatta
+  // il pulsante grande riprende la lezione lasciata a metà, o porta alla prima non ancora fatta
   const next = LESSONS.findIndex((l) => !p.done.includes(l.id));
-  const i = next < 0 ? 0 : next;
-  $('tutorial-start').textContent = `${next < 0 ? 'Rivedi' : p.done.length ? 'Continua' : 'Inizia'}: `
-    + `${i + 1}. ${LESSONS[i].title}`;
+  const i = resume ? resume.index : next < 0 ? 0 : next;
+  $('tutorial-start').textContent = resume
+    ? `Riprendi: ${i + 1}. ${LESSONS[i].title} · passo ${resume.step + 1}`
+    : `${next < 0 ? 'Rivedi' : p.done.length ? 'Continua' : 'Inizia'}: ${i + 1}. ${LESSONS[i].title}`;
   $('tutorial-start').onclick = () => startTutorialLesson(i);
 }
 
@@ -658,7 +667,7 @@ function openTutorialList() {
 
 const TUTORIAL_SECTOR = 'NWA';   // NW ALTO di Roma ACC: passaggi lunghi e uscite di ogni tipo
 
-function startTutorialLesson(index) {
+function startTutorialLesson(index, { resume = true } = {}) {
   const lesson = LESSONS[index];
   if (!lesson) return;
   selectCentre('roma');
@@ -669,7 +678,7 @@ function startTutorialLesson(index) {
     weather: { storms: false, turbulence: false, intensity: 0 },
     emergencyPct: 0,
   }, lesson);
-  tutorial.start(index);
+  tutorial.start(index, { resume });
 }
 
 $('tutorial-cta').addEventListener('click', openTutorialList);
@@ -683,6 +692,7 @@ $('tutorial-reset').addEventListener('click', () => {
   tutorial ??= new Tutorial(tutorialApi);
   tutorial.progress.done = [];
   tutorial.progress.stars = {};
+  tutorial.progress.current = null;
   try {
     localStorage.setItem('atc-tutorial-progress', JSON.stringify(tutorial.progress));
   } catch { /* archivio non disponibile */ }
@@ -695,7 +705,7 @@ $('ld-next').addEventListener('click', () => {
   if (next < LESSONS.length) startTutorialLesson(next);
   else showStartScreen();
 });
-$('ld-again').addEventListener('click', () => startTutorialLesson(tutorial?.lessonIndex ?? 0));
+$('ld-again').addEventListener('click', () => startTutorialLesson(tutorial?.lessonIndex ?? 0, { resume: false }));
 $('ld-list').addEventListener('click', () => openTutorialList());
 
 renderTutorialCta();
@@ -989,11 +999,6 @@ for (const el of document.querySelectorAll('#about-donate, #donate-btn, #support
   el.addEventListener('click', () => openExternal(donateUrl));
 }
 $('about-project').addEventListener('click', () => openExternal(`${PROJECT_URL}/releases/latest`));
-// nel browser (non nell'applicazione) si invita a scaricare il programma completo
-if (!window.acs) {
-  $('download-btn').classList.remove('hidden');
-  $('download-btn').addEventListener('click', () => openExternal(`${PROJECT_URL}/releases/latest`));
-}
 $('about-issues').addEventListener('click', () => openExternal(ISSUES_URL));
 buildAbout();
 

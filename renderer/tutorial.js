@@ -921,13 +921,28 @@ export const LESSONS = [
 
 const PROGRESS_KEY = 'atc-tutorial-progress';
 
+// done: lezioni completate · stars: stelle per lezione · sound: suoni sì/no
+// current: la lezione lasciata a metà e il passo raggiunto, per riprendere da lì al prossimo avvio
 export function loadProgress() {
   try {
     const raw = JSON.parse(localStorage.getItem(PROGRESS_KEY) ?? '{}');
-    return { done: Array.isArray(raw.done) ? raw.done : [], stars: raw.stars ?? {}, sound: raw.sound !== false };
+    const cur = raw.current;
+    const lesson = cur && LESSONS.find((l) => l.id === cur.id);
+    const current = lesson && Number.isInteger(cur.step) && cur.step > 0 && cur.step < lesson.steps.length
+      ? { id: cur.id, step: cur.step, mistakes: cur.mistakes | 0, hintsUsed: cur.hintsUsed | 0, skipped: cur.skipped | 0 }
+      : null;
+    return { done: Array.isArray(raw.done) ? raw.done : [], stars: raw.stars ?? {}, sound: raw.sound !== false, current };
   } catch {
-    return { done: [], stars: {}, sound: true };
+    return { done: [], stars: {}, sound: true, current: null };
   }
+}
+
+// la lezione lasciata a metà, se c'è: { index, step, of }
+export function resumePoint(progress) {
+  const cur = progress.current;
+  if (!cur) return null;
+  const index = LESSONS.findIndex((l) => l.id === cur.id);
+  return index < 0 ? null : { index, step: cur.step, of: LESSONS[index].steps.length };
 }
 
 function saveProgress(p) {
@@ -1048,7 +1063,8 @@ export class Tutorial {
 
   // --- svolgimento ----------------------------------------------------------
 
-  start(lessonIndex) {
+  // resume: se la lezione era stata lasciata a metà, si riparte dal passo raggiunto
+  start(lessonIndex, { resume = true } = {}) {
     this.lessonIndex = lessonIndex;
     this.lesson = LESSONS[lessonIndex];
     this.mem = {};
@@ -1060,7 +1076,29 @@ export class Tutorial {
     $('coach-min').textContent = '–';
     $('lesson-done').classList.add('hidden');
     this._buildDots();
-    this._enter(0);
+    const cur = this.progress.current;
+    if (resume && cur && cur.id === this.lesson.id) this._resume(cur);
+    else this._enter(0);
+  }
+
+  // Riprende una lezione dal passo salvato. I passi già fatti si ripercorrono in silenzio, come se
+  // si premesse "Salta" su ciascuno: ognuno prepara la situazione per il successivo, e il passo
+  // raggiunto trova il traffico e le zone come li aveva lasciati la volta prima.
+  _resume(cur) {
+    this._replaying = true;
+    // un passo che non si riesce a preparare passa da solo al successivo: si prosegue da dove è arrivato
+    let i = 0;
+    while (this.active && i < cur.step) {
+      this._enter(i);
+      i = this.stepIndex + 1;
+    }
+    this._replaying = false;
+    if (!this.active) return;
+    this.mistakes = cur.mistakes;
+    this.hintsUsed = cur.hintsUsed;
+    this.skipped = cur.skipped;
+    this._enter(cur.step);
+    this.api.toast(`Riprendi da dove eri: passo ${cur.step + 1} di ${this.lesson.steps.length}`, 'info');
   }
 
   stop() {
@@ -1127,12 +1165,22 @@ export class Tutorial {
     if (sim) sim.paused = !!step.freeze;
     this.api.syncPause();
     if (!ok) {
-      this.api.toast('Non sono riuscito a preparare questa situazione: passo al punto successivo', 'warn');
+      if (!this._replaying) this.api.toast('Non sono riuscito a preparare questa situazione: passo al punto successivo', 'warn');
       this._enter(index + 1);
       return;
     }
+    if (this._replaying) return;
+    this._checkpoint();
     this.sound('step');
     this._render();
+  }
+
+  // il punto raggiunto resta salvato: chiudendo il gioco a metà lezione si riprende da qui
+  _checkpoint() {
+    this.progress.current = this.stepIndex > 0
+      ? { id: this.lesson.id, step: this.stepIndex, mistakes: this.mistakes, hintsUsed: this.hintsUsed, skipped: this.skipped }
+      : (this.progress.current?.id === this.lesson.id ? null : this.progress.current);
+    saveProgress(this.progress);
   }
 
   _text(v) {
@@ -1390,6 +1438,7 @@ export class Tutorial {
         : this.mistakes <= 1 && this.skipped <= 1 ? 2 : 1;
     if (!this.progress.done.includes(id)) this.progress.done.push(id);
     this.progress.stars[id] = Math.max(this.progress.stars[id] ?? 0, stars);
+    if (this.progress.current?.id === id) this.progress.current = null;
     saveProgress(this.progress);
     this.sound('lesson');
 
