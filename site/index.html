@@ -340,7 +340,12 @@
 
   /* --- scarica e sostegno --- */
   .dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 30px; }
+  .dl-item { display: flex; flex-direction: column; gap: 10px; }
   .dl .btn { text-align: left; padding: 16px 20px; }
+  .dl .alt { width: fit-content; font-size: 13.5px; color: var(--muted); }
+  .dl .alt:hover { color: var(--text); }
+  .dl-status { min-height: 1.6em; margin: 18px 0 0; font-size: 14px; color: var(--muted); }
+  .dl-status b { color: var(--green); font-weight: 600; }
   .dl .recommended { border-color: var(--green); }
   .dl .recommended::after { content: "il tuo sistema"; display: block; margin-top: 6px; font: 600 11.5px/1 var(--mono); color: var(--green); letter-spacing: 0.04em; }
   details { margin-top: 18px; font-size: 14.5px; color: var(--muted); max-width: 62em; }
@@ -542,11 +547,20 @@
       <h2 data-reveal>Oppure scaricalo.</h2>
       <p class="intro" data-reveal style="--d: 1">Lo stesso simulatore, in una finestra sua. Funziona anche senza internet.</p>
       <div class="dl">
-        <a class="btn" data-reveal style="--d: 2" data-os="mac" href="https://github.com/acs-simulator/acs-simulator/releases/latest">macOS<small>Apple Silicon e Intel · .dmg</small></a>
-        <a class="btn" data-reveal style="--d: 3" data-os="win" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Windows<small>10 o successivo · .exe</small></a>
-        <a class="btn" data-reveal style="--d: 4" data-os="linux" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Linux<small>.AppImage e .deb</small></a>
+        <div class="dl-item" data-reveal style="--d: 2">
+          <a class="btn" data-os="mac" data-asset="mac" href="https://github.com/acs-simulator/acs-simulator/releases/latest">macOS<small data-meta>Apple Silicon · .dmg</small></a>
+          <a class="alt" data-asset="mac-alt" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Hai un Mac con processore Intel?</a>
+        </div>
+        <div class="dl-item" data-reveal style="--d: 3">
+          <a class="btn" data-os="win" data-asset="win" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Windows<small data-meta>10 o successivo · .exe</small></a>
+        </div>
+        <div class="dl-item" data-reveal style="--d: 4">
+          <a class="btn" data-os="linux" data-asset="linux" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Linux<small data-meta>AppImage</small></a>
+          <a class="alt" data-asset="deb" href="https://github.com/acs-simulator/acs-simulator/releases/latest">Pacchetto .deb per Debian e Ubuntu</a>
+        </div>
       </div>
-      <details>
+      <p class="dl-status" id="dl-status" aria-live="polite"></p>
+      <details id="primo-avvio">
         <summary>Al primo avvio compare un avviso di sicurezza?</summary>
         <p>È normale: il programma non è firmato con un certificato a pagamento. Su <b>macOS</b> apri con <b>clic destro → Apri</b>; su <b>Windows</b> scegli <b>Ulteriori informazioni → Esegui comunque</b>. Le istruzioni complete sono nella <a href="https://github.com/acs-simulator/acs-simulator#al-primo-avvio">pagina del progetto</a>.</p>
       </details>
@@ -575,19 +589,113 @@
 </footer>
 
 <script>
-  // evidenzia il sistema di chi guarda la pagina
+  // --- scarica: il pulsante giusto per chi guarda, e il file dell'ultima versione in un clic -------
+  // Al caricamento si chiede a GitHub l'elenco dei file dell'ultima release: ogni pulsante punta poi
+  // direttamente al suo file, e il download parte senza passare dalla pagina di GitHub (né serve un
+  // account). Se la richiesta non riesce i pulsanti restano sulla pagina della release.
   (function () {
+    var API = 'https://api.github.com/repos/acs-simulator/acs-simulator/releases/latest';
     var ua = navigator.userAgent || '';
-    var os = /Windows/.test(ua) ? 'win' : /Mac/.test(ua) && !/iPhone|iPad/.test(ua) ? 'mac' : /Linux|X11/.test(ua) && !/Android/.test(ua) ? 'linux' : null;
+    var os = /Windows/.test(ua) ? 'win' : /Mac/.test(ua) && !/iPhone|iPad/.test(ua) && navigator.maxTouchPoints < 2 ? 'mac' : /Linux|X11/.test(ua) && !/Android/.test(ua) ? 'linux' : null;
     var names = { mac: 'macOS', win: 'Windows', linux: 'Linux' };
+    var status = document.getElementById('dl-status');
+    var hero = document.getElementById('download');
+
     // su telefono o schermo stretto il radar non è utilizzabile: meglio dirlo prima del clic
     if (window.matchMedia('(max-width: 1000px), (pointer: coarse)').matches) {
       document.querySelector('#play small').textContent = 'da un computer, con il mouse';
     }
-    if (!os) return;
-    var btn = document.querySelector('[data-os="' + os + '"]');
-    if (btn) btn.classList.add('recommended');
-    document.getElementById('download-os').textContent = 'per ' + names[os];
+
+    // Mac Intel o Apple Silicon? Il browser non lo dice; la scheda grafica a volte sì.
+    // Senza indizi si propone Apple Silicon, che è su tutti i Mac dal 2020.
+    var intel = false;
+    if (os === 'mac') {
+      try {
+        var gl = document.createElement('canvas').getContext('webgl');
+        var ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+        var gpu = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+        intel = !/Apple M\d/i.test(gpu) && /Intel|AMD|Radeon|NVIDIA/i.test(gpu);
+      } catch (e) { /* nessun indizio */ }
+    }
+    // il pulsante macOS scarica la versione più probabile, il link sotto l'altra
+    var pick = {
+      mac: intel ? /x64\.dmg$/i : /arm64\.dmg$/i,
+      'mac-alt': intel ? /arm64\.dmg$/i : /x64\.dmg$/i,
+      win: /\.exe$/i,
+      linux: /\.AppImage$/i,
+      deb: /\.deb$/i,
+    };
+    var macBtn = document.querySelector('[data-asset="mac"]');
+    if (intel) {
+      macBtn.querySelector('small').textContent = 'Intel · .dmg';
+      document.querySelector('[data-asset="mac-alt"]').textContent = 'Hai un Mac con Apple Silicon?';
+    }
+
+    if (os) {
+      document.querySelector('[data-os="' + os + '"]').classList.add('recommended');
+      document.getElementById('download-os').textContent = 'per ' + names[os];
+    }
+
+    var mb = function (bytes) { return Math.round(bytes / 1048576) + ' MB'; };
+    function apply(rel) {
+      var files = {};
+      Object.keys(pick).forEach(function (key) {
+        var asset = (rel.assets || []).filter(function (a) { return pick[key].test(a.name); })[0];
+        if (!asset) return;
+        files[key] = asset;
+        document.querySelectorAll('[data-asset="' + key + '"]').forEach(function (a) {
+          a.href = asset.browser_download_url;
+          a.dataset.file = asset.name;
+          a.dataset.size = mb(asset.size);
+          var meta = a.querySelector('[data-meta]');
+          if (meta) meta.textContent += ' · ' + mb(asset.size);
+        });
+      });
+      var version = String(rel.tag_name || '').replace(/^v/, '');
+      if (version) status.innerHTML = 'Versione <b>' + version + '</b>, gratis, senza account.';
+      // il pulsante in cima scarica direttamente per il sistema di chi guarda
+      var mine = os && files[os];
+      if (mine) {
+        hero.href = mine.browser_download_url;
+        hero.dataset.file = mine.name;
+        hero.dataset.size = mb(mine.size);
+        document.getElementById('download-os').textContent = 'per ' + names[os] + ' · ' + mb(mine.size);
+      }
+    }
+
+    // la risposta si tiene per un'ora: chi gira fra le pagine non rifà la richiesta
+    var cached = null;
+    try {
+      cached = JSON.parse(sessionStorage.getItem('acs-release') || 'null');
+      if (cached && Date.now() - cached.at > 3600 * 1000) cached = null;
+    } catch (e) { cached = null; }
+    if (cached) {
+      apply(cached.rel);
+    } else if (window.fetch) {
+      fetch(API, { headers: { Accept: 'application/vnd.github+json' } })
+        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (rel) {
+          var slim = { tag_name: rel.tag_name, assets: (rel.assets || []).map(function (a) { return { name: a.name, size: a.size, browser_download_url: a.browser_download_url }; }) };
+          try { sessionStorage.setItem('acs-release', JSON.stringify({ at: Date.now(), rel: slim })); } catch (e) { /* niente cache */ }
+          apply(slim);
+        })
+        .catch(function () { /* restano i link alla pagina della release */ });
+    }
+
+    // dopo il clic: conferma, e le istruzioni per il primo avvio a portata di mano
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[data-file]');
+      if (!a) return;
+      status.innerHTML = 'Download avviato: <b>' + a.dataset.file + '</b> (' + a.dataset.size + '). Se non parte, <a href="' + a.href + '">riprova</a>.';
+      document.getElementById('primo-avvio').open = true;
+      if (a === hero) {
+        setTimeout(function () {
+          var target = document.getElementById('scarica');
+          if (window.__lenis) window.__lenis.scrollTo(target, { duration: 1.6 });
+          else target.scrollIntoView({ behavior: 'smooth' });
+        }, 400);
+      }
+    });
   })();
 
   // --- movimento ---------------------------------------------------------------------------------
@@ -636,6 +744,7 @@
     window.addEventListener('load', function () {
       if (still || !window.Lenis) return;
       lenis = new window.Lenis({ lerp: 0.085, wheelMultiplier: 0.9 });
+      window.__lenis = lenis;
       var raf = function (t) { lenis.raf(t); requestAnimationFrame(raf); };
       requestAnimationFrame(raf);
     });
