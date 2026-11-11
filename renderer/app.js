@@ -1,4 +1,4 @@
-import { Simulation, predictConflicts, OURS, MAX_STRIKES } from './sim.js';
+import { Simulation, MAX_STRIKES } from './sim.js';
 import {
   render, makeTransform, measureAt, radarView, resetView, panBy, zoomTo, ZOOM_RANGE, tagVisible, TAG_FL_RANGE,
   rotateTag, freeTag, waypointShown, VECTOR_RANGE, deconflictTags, tagFieldAt, tagNameAt, cpaAt, labelAt, setHovered, labelBlock,
@@ -1397,12 +1397,6 @@ for (const [kind, def] of [['stars', true], ['sids', false]]) {
   }
 }
 
-let showFutureConflicts = false;
-$('conflict-toggle').addEventListener('click', () => {
-  showFutureConflicts = !showFutureConflicts;
-  $('conflict-toggle').classList.toggle('active', showFutureConflicts);
-});
-
 // --- ciclo principale ------------------------------------------------------
 
 function updateHud() {
@@ -1486,11 +1480,8 @@ function loop(now) {
     if (isAircraft(rbStart) && !sim.aircraft.includes(rbStart)) rbStart = null;
     if (cpas.length) cpas = cpas.filter((c) => sim.aircraft.includes(c.a) && sim.aircraft.includes(c.b));
     if (cpaFirst && !sim.aircraft.includes(cpaFirst)) cpaFirst = null;
-    const futureConflicts = showFutureConflicts
-      ? predictConflicts(sim.aircraft).filter((c) => OURS.has(c.a.control) || OURS.has(c.b.control))
-      : [];
     render(ctx, canvas, sim, {
-      futureConflicts,
+      futureConflicts: [],
       stca: sim.stca,
       preview: labelPanel.preview,
       now,
