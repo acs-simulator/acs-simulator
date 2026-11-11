@@ -294,14 +294,6 @@ html, body {
   color: var(--green);
 }
 
-.two-buttons > button { flex: 1; padding: 6px; }
-
-#conflict-toggle.active {
-  background: #4a1414;
-  border-color: var(--red);
-  color: var(--red);
-}
-
 #hud-strikes { display: flex; gap: 6px; }
 
 .strike {
@@ -1596,7 +1588,6 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 #label-panel button.handon { color: var(--magenta) !important; }
 #label-panel button.handoff { color: var(--green) !important; }
 #label-panel button.handoff.level-wrong { color: var(--orange) !important; }
-#conflict-toggle.active { color: var(--red) !important; }
 #tag-btn.filtered:not(.active) { color: var(--blue) !important; }
 
 .sector-card:hover { background: #24425a !important; }
@@ -2195,3 +2186,223 @@ button.link {
 @media (max-width: 1000px), (max-height: 600px) {
   #screen-guard { display: flex; }
 }
+
+/* =========================================================================
+   Controlli dell'interfaccia (tutto tranne il radar): una sola misura e un
+   solo rilievo da console per pulsanti, campi e gruppi. Questo blocco viene
+   per ultimo e mette d'accordo le regole precedenti.
+   ========================================================================= */
+
+:root {
+  --ctl: 30px;          /* altezza di pulsanti e campi */
+  --ctl-sm: 24px;       /* pulsanti icona dentro un gruppo */
+  --ctl-bar: 34px;      /* altezza dei gruppi della barra sul radar */
+  --ctl-gap: 6px;
+  --btn-top: #22405a;
+  --btn-bottom: #172c3f;
+  --btn-hover-top: #2a4e6c;
+  --btn-hover-bottom: #1d3850;
+  --well: #071019;      /* fondo dei campi e dei gruppi, scavato */
+}
+
+/* --- pulsanti ------------------------------------------------------------ */
+
+#statusbar button, #label-panel button, #radar-tools button, #radar-tools .tool-menu button,
+.coach-foot button, .coach-head-btns button, .start-links button, .go-actions button, #help-close, .donate-wide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--ctl);
+  padding: 0 12px;
+  font: 500 12.5px/1.2 -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: var(--text) !important;
+  background: linear-gradient(180deg, var(--btn-top), var(--btn-bottom)) !important;
+  border: 1px solid !important;
+  border-color: var(--edge-light) var(--edge-dark) var(--edge-dark) var(--edge-light) !important;
+  border-radius: 0 !important;
+  cursor: pointer;
+  filter: none !important;
+  transition: color 0.12s;
+}
+
+#statusbar button:hover:not(:disabled), #label-panel button:hover:not(:disabled), #radar-tools button:hover:not(:disabled),
+#radar-tools .tool-menu button:hover, .coach-foot button:hover, .coach-head-btns button:hover, .start-links button:hover,
+.go-actions button:hover, #help-close:hover, .donate-wide:hover {
+  background: linear-gradient(180deg, var(--btn-hover-top), var(--btn-hover-bottom)) !important;
+}
+
+/* premuto, attivo, scelto: rilievo invertito, testo bianco e una riga azzurra in basso */
+#statusbar button:active:not(:disabled), #label-panel button:active:not(:disabled), #radar-tools button:active:not(:disabled),
+#statusbar button.active, #radar-tools button.active, #radar-tools button[aria-pressed='true'],
+#radar-tools .tool-menu button.active, #radar-tools .tool-menu .map-check[aria-pressed='true'], .go-actions button.primary {
+  color: #fff !important;
+  background: var(--btn-down) !important;
+  border-color: var(--edge-dark) var(--edge-light) var(--edge-light) var(--edge-dark) !important;
+  box-shadow: inset 0 -2px 0 var(--blue);
+}
+
+#statusbar button:focus-visible, #label-panel button:focus-visible, #radar-tools button:focus-visible,
+.coach-foot button:focus-visible, .coach-head-btns button:focus-visible, .start-links button:focus-visible {
+  outline: 1px solid var(--blue);
+  outline-offset: 1px;
+}
+
+#statusbar button:disabled, #label-panel button:disabled, #radar-tools button:disabled { opacity: 0.35; cursor: default; }
+
+/* pulsanti quadrati con un'icona o un segno */
+.icon-btn, #label-panel #label-close, .coach-head-btns button {
+  width: var(--ctl);
+  padding: 0 !important;
+}
+.icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+#help-btn { width: var(--ctl); line-height: 1; font-size: 14px; font-weight: 600; }
+#support-btn { color: var(--yellow) !important; }
+
+/* --- colonna di destra ----------------------------------------------------- */
+
+#sidebar { padding: 14px 14px 18px; }
+.sector-head { align-items: flex-start; margin-bottom: 12px; }
+.head-buttons { gap: var(--ctl-gap); flex: none; }
+#hud-sector-sub { margin-top: 3px; line-height: 1.35; }
+
+.menu {
+  background: rgba(10, 20, 32, 0.55);
+  border: 1px solid var(--line-soft);
+  margin-bottom: 10px;
+}
+.menu > summary { min-height: 38px; padding: 0 12px; }
+.menu-title { font-size: 13px; letter-spacing: 0.02em; }
+.menu-body { padding: 2px 12px 12px; }
+
+/* i quattro contatori in una griglia 2 x 2, tutti uguali */
+.hud-grid { grid-template-columns: 1fr 1fr; gap: var(--ctl-gap); margin-bottom: 12px; }
+.hud-cell {
+  min-height: 52px;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: var(--well);
+  border: 1px solid var(--line-soft);
+}
+.hud-cell span { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; }
+.hud-cell strong { font-size: 19px; line-height: 1; }
+.hud-cell.offered.active { border-color: var(--magenta); background: rgba(255, 91, 216, 0.08); }
+
+#statusbar .row { min-height: var(--ctl); margin-bottom: 10px; font-size: 12.5px; }
+.ctl-label { margin: 0 0 6px; font-size: 12.5px; color: rgba(215, 230, 234, 0.6); }
+
+/* comando a segmenti: quattro pulsanti della stessa larghezza su tutta la riga */
+.seg-ctl { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--ctl-gap); margin-bottom: 8px; }
+.seg-ctl button, #speed-buttons button { width: 100%; margin: 0 !important; font-family: ui-monospace, Menlo, monospace !important; }
+#statusbar button.wide { width: 100%; }
+
+#areas-list { gap: 3px; }
+.area-row { padding: 4px 8px; }
+#areas-menu .hint { margin: 8px 0 0; }
+
+/* --- pannello del volo ----------------------------------------------------- */
+
+#label-panel { padding: 14px; background: rgba(10, 20, 32, 0.7); border: 1px solid var(--line-soft); }
+#label-header { align-items: center; gap: 10px; }
+#label-badges { gap: var(--ctl-gap); margin: 10px 0; }
+.badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; }
+
+#label-panel input[type="number"], #label-panel select {
+  height: var(--ctl);
+  padding: 0 8px;
+  font-size: 13px;
+  background: var(--well);
+  border: 1px solid;
+  border-color: var(--edge-dark) var(--edge-light) var(--edge-light) var(--edge-dark);
+  border-radius: 0;
+}
+#label-panel input[type="number"]:focus, #label-panel select:focus { outline: 1px solid var(--blue); outline-offset: 0; }
+
+.stepper { grid-template-columns: repeat(2, 42px) 1fr repeat(2, 42px); gap: var(--ctl-gap); margin: 10px 0 8px; }
+.inline { gap: var(--ctl-gap); margin-bottom: var(--ctl-gap); align-items: stretch; }
+.inline > button, .inline > select { min-width: 0; }
+.deviation span { min-width: 38px; }
+#label-panel button.wide { width: 100%; }
+.field-group { padding-top: 12px; margin-top: 14px; }
+
+#transfer-box { padding: 10px 12px; background: var(--well); }
+.transfer-row { gap: 12px; }
+#label-panel button.handon, #label-panel button.handoff { min-height: 42px; padding: 0 16px; font-weight: 700; letter-spacing: 0.05em; }
+#label-panel button.handon { color: var(--magenta) !important; box-shadow: inset 0 -2px 0 var(--magenta); }
+#label-panel button.handoff { color: var(--green) !important; box-shadow: inset 0 -2px 0 var(--green); }
+#label-panel button.handoff.level-wrong { color: var(--orange) !important; box-shadow: inset 0 -2px 0 var(--orange); }
+#label-panel button.primary { color: var(--green) !important; }
+
+#label-last { padding: 7px 10px; background: var(--well); }
+
+/* i piccoli pulsanti dentro l'elenco della rotta restano piccoli */
+#label-panel .wp-actions button { min-height: 20px; height: 20px; padding: 0 7px; font-size: 11px; }
+
+/* gli avvisi del volo sono righe rosse, non pulsanti qualsiasi */
+#label-panel .alert-item {
+  justify-content: space-between;
+  min-height: var(--ctl);
+  padding: 6px 10px;
+  text-align: left;
+  white-space: normal;
+  color: #ff9a9a !important;
+  background: #3a1010 !important;
+  border-color: var(--red) !important;
+}
+#label-panel .alert-item.now { color: #fff !important; background: #6a1010 !important; }
+
+/* --- barra degli strumenti sul radar --------------------------------------- */
+
+#radar-tools { gap: var(--ctl-gap); align-items: center; }
+#radar-tools > button, .tool-pop > button, .tool-vector, .tool-zoom { height: var(--ctl-bar); min-height: var(--ctl-bar) !important; }
+#radar-tools > button, .tool-pop > button { padding: 0 14px; }
+.tool-vector, .tool-zoom {
+  gap: 10px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  background: rgba(7, 16, 25, 0.94) !important;
+  border: 1px solid;
+  border-color: var(--edge-dark) var(--edge-light) var(--edge-light) var(--edge-dark) !important;
+}
+.tool-vector > span { color: rgba(215, 230, 234, 0.75); }
+.tool-vector output, .tool-zoom output { font-size: 12px; color: var(--text); }
+.tool-zoom { gap: 8px; padding: 0 5px; }
+/* dentro i gruppi i pulsanti sono piccoli quadrati con lo stesso rilievo */
+#radar-tools .tool-zoom button { width: var(--ctl-sm); height: var(--ctl-sm); min-height: var(--ctl-sm); padding: 0; font-size: 14px; }
+#radar-tools .tool-zoom button svg { width: 14px; height: 14px; }
+.tool-pop .caret { margin-left: 2px; }
+
+.tool-menu { width: 210px; padding: 10px; gap: var(--ctl-gap); background: rgba(8, 16, 24, 0.97); border: 1px solid; border-color: var(--edge-light) var(--edge-dark) var(--edge-dark) var(--edge-light); }
+#radar-tools .tool-menu button { width: 100%; justify-content: flex-start; padding: 0 10px; }
+#radar-tools .tool-menu .menu-row > button { justify-content: center; }
+#map-points { gap: var(--ctl-gap); }
+.map-menu-title { margin: 6px 2px 0; }
+.map-menu-title:first-child { margin-top: 0; }
+/* caselle vere invece dei simboli di testo */
+.map-check::before, .map-check[aria-pressed='true']::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--edge-light);
+  background: var(--well);
+}
+.map-check[aria-pressed='true']::before { background: var(--green); border-color: var(--green); box-shadow: inset 0 0 0 2px var(--well); }
+
+/* --- tutorial, schermate e finestre ---------------------------------------- */
+
+.coach-head-btns { gap: 4px; }
+.coach-head-btns button { width: var(--ctl-sm); min-height: var(--ctl-sm); height: var(--ctl-sm); font-size: 13px; }
+.coach-foot { gap: var(--ctl-gap); }
+.coach-foot button { flex: 1; }
+.coach-foot button.primary { color: var(--blue) !important; box-shadow: inset 0 -2px 0 var(--blue); }
+.start-links { gap: var(--ctl-gap); }
+.start-links button.donate { color: var(--yellow) !important; }
+.go-actions { gap: var(--ctl-gap); }
+.go-actions button { flex: 1; }
+
+/* il caffè disegnato, accanto al testo dei pulsanti di sostegno */
+svg.cup { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+button.donate:has(svg.cup) { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
