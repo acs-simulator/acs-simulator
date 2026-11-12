@@ -29,13 +29,14 @@ function nearExit(ac) {
 }
 
 export function measure(centreId, sectorId, hours = 5, seed = 1) {
-  setCentre(centreId);
-  loadSector(sectorId);
+  // il seme va fissato prima di caricare il settore: anche le piste in uso (vento) si scelgono a caso
   let rnd = (seed * 2654435761) % 4294967296;
   Math.random = () => {
     rnd = (rnd * 1664525 + 1013904223) % 4294967296;
     return rnd / 4294967296;
   };
+  setCentre(centreId);
+  loadSector(sectorId);
   // DIFF=facile|media|difficile per misurare un'altra difficoltà (di default quella del settore)
   const sim = new Simulation(process.env.DIFF ? { difficulty: process.env.DIFF } : {});
   sim._endGame = () => {};   // le perdite di separazione non fermano la misura

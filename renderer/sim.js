@@ -662,7 +662,8 @@ export function stepGhost(g, dt) {
   } else if (g.control === 'inbound' || g.control === 'offered') {
     g.assignedAltitude = inboundAltitude(g);
   } else if (g.control === 'other') {
-    g.assignedAltitude = Math.round(profileAltitude(g.profile, g._along) / 100) * 100;
+    const ft = Math.round(profileAltitude(g.profile, g._along) / 100) * 100;
+    g.assignedAltitude = g.capFt == null ? ft : Math.min(ft, g.capFt);
   } else if (g.control === 'transferred' && g.mode === 'route') {
     const profileFt = Math.round(profileAltitude(g.profile, g._along) / 100) * 100;
     g.assignedAltitude = transferredAltitude(g, profileFt, profilePhase(g.profile, g._along));
@@ -2031,12 +2032,19 @@ export class Simulation {
     const phase = profilePhase(ac.profile, ac.profileS);
 
     if (ac.control === 'other') {
-      ac.assignedAltitude = profileFt;
+      // capFt: salita fermata dall'ente precedente per un arrivo che alla fine non è passato da noi
+      ac.assignedAltitude = ac.capFt == null ? profileFt : Math.min(profileFt, ac.capFt);
     } else if (ac.control === 'inbound' || ac.control === 'offered') {
       // l'ente precedente mantiene il volo sul livello coordinato
       ac.assignedAltitude = coordinatedAltitude(profileFt, ac.clamp, ac.entryFt, ac.capFt, phase === 'climb');
       if (ac.control === 'inbound' && (inside || ((ac.entryS - s) / ac.speed) * 3600 <= OFFER_LEAD_S)) {
-        this._levelOffArrival(ac);
+        if (!this._levelOffArrival(ac)) {
+          // livellato fuori dal nostro volume o sotto il livello d'uscita: l'ente precedente lo passa direttamente
+          // all'ente successivo, non a noi
+          ac.control = 'other';
+          ac.plannedConflict = null;
+          return;
+        }
         ac.control = 'offered';
         ac.offeredAt = this.simTime;
         this._emit('event', { type: 'offered', ac });
@@ -2081,19 +2089,29 @@ export class Simulation {
   }
 
   // Un arrivo (nel nostro settore deve scendere) non ci viene mai passato in salita. Il piano lo prevede già
-  // livellato (traffic.js, coordinate); se però ha deviato per un temporale ed è rimasto indietro sul profilo,
-  // l'ente precedente ferma la salita al primo livello sopra quello attuale e ce lo passa a quel livello.
+  // livellato (traffic.js, coordinate); se però è rimasto indietro sul profilo (ha deviato per un temporale, o
+  // sale più lentamente del previsto), l'ente precedente ferma la salita al primo livello sopra quello attuale e ce
+  // lo passa a quel livello. Un arrivo verso la STAR ci arriva allora più basso e il livello d'uscita verso
+  // l'avvicinamento scende con lui; se invece quel livello è fuori dal nostro volume, o sotto il livello a cui
+  // dovrebbe uscire dal basso, il volo non passa da noi (false).
   _levelOffArrival(ac) {
     const xflFt = ac.requestedExitFL * 100;
     const descends = ac.exitKind === 'bottom' || ac.exitKind === 'star' || xflFt < ac.entryFt;
-    if (!descends) return;
+    if (!descends || ac.assignedAltitude <= ac.altitude + 300) return true;
     const next = Math.ceil((ac.altitude - 100) / 1000) * 1000;
-    if (ac.clamp === 'climb' && ac.altitude < ac.entryFt - 300) {
-      ac.entryFt = Math.min(ac.entryFt, Math.max(next, ac.exitKind === 'lateral' ? 0 : xflFt));
-    } else if (ac.clamp === 'descend' && ac.assignedAltitude > ac.altitude + 300) {
+    if (next >= ac.entryFt) {
+      // sopra il livello d'ingresso e ancora in salita verso la crociera: si ferma qui e ci arriva in discesa
       ac.capFt = Math.max(ac.entryFt, next);
-    } else return;
+    } else {
+      // sotto il livello d'ingresso: lo raggiungerebbe solo nel nostro settore
+      if (next < airspace.floorFt || next >= airspace.ceilingFt) return false;
+      if (ac.exitKind === 'bottom' && next < xflFt) return false;
+      if (ac.exitKind === 'star') ac.requestedExitFL = Math.min(ac.requestedExitFL, next / 100);
+      ac.entryFt = next;
+      ac.capFt = next;
+    }
     ac.assignedAltitude = coordinatedAltitude(ac.assignedAltitude, ac.clamp, ac.entryFt, ac.capFt, false);
+    return true;
   }
 
   // Short Term Conflict Alert: coppie con almeno un volo di nostra competenza che, proseguendo
