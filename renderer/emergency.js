@@ -4,7 +4,7 @@
 // Se il volo deve dirottare, il piano cambia di conseguenza: diretto all'aeroporto scelto, nuovo livello
 // d'uscita e nuovo ente successivo, come per una normale uscita dal basso verso l'avvicinamento.
 // Il controllore deve autorizzare la discesa e passare il volo. Se la discesa non arriva, le avarie gravi
-// scendono lo stesso (il pilota naviga come ritiene appropriato e avvisa l'ATC).
+// scendono lo stesso: il pilota naviga come ritiene appropriato e avvisa l'ATC.
 // L'avaria radio (7600) non parla: mantiene livello e velocità per 7 minuti, poi riprende il piano di volo
 // e non accetta più istruzioni.
 
