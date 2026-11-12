@@ -2032,8 +2032,9 @@ export class Simulation {
     const phase = profilePhase(ac.profile, ac.profileS);
 
     if (ac.control === 'other') {
-      // capFt: salita fermata dall'ente precedente per un arrivo che alla fine non è passato da noi
-      ac.assignedAltitude = ac.capFt == null ? profileFt : Math.min(profileFt, ac.capFt);
+      ac.assignedAltitude = profileFt;
+      // salita fermata dall'ente precedente per un arrivo che alla fine non è passato da noi
+      if (ac.capFt != null) ac.assignedAltitude = Math.min(ac.assignedAltitude, ac.capFt);
     } else if (ac.control === 'inbound' || ac.control === 'offered') {
       // l'ente precedente mantiene il volo sul livello coordinato
       ac.assignedAltitude = coordinatedAltitude(profileFt, ac.clamp, ac.entryFt, ac.capFt, phase === 'climb');
