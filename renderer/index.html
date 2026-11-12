@@ -64,11 +64,13 @@
           <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="16" r="1.8" /><circle cx="16" cy="4" r="1.8" /><path d="M5.5 14.5 L14.5 5.5" /></svg>
           R&amp;B
         </button>
-        <label class="tool-vector" title="Vettore velocità (min)">
+        <div class="tool-vector" role="group" aria-label="Vettore velocità" title="Vettore velocità (min)">
           <span>Vettore</span>
-          <input type="range" id="vector-range" min="1" max="10" step="1" value="2" />
+          <button id="vector-down" title="Vettore più corto di un minuto" aria-label="Accorcia il vettore">−</button>
+          <input type="range" id="vector-range" min="1" max="10" step="1" value="2" aria-label="Minuti del vettore velocità" />
+          <button id="vector-up" title="Vettore più lungo di un minuto" aria-label="Allunga il vettore">+</button>
           <output id="vector-value">2 min</output>
-        </label>
+        </div>
         <div class="tool-zoom" role="group" aria-label="Zoom">
           <button id="zoom-out" title="Rimpicciolisci">−</button>
           <input type="range" id="zoom-range" min="0" max="100" step="1" aria-label="Zoom" />
