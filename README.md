@@ -94,7 +94,7 @@ ogni momento il riepilogo dei comandi.
 - **Zone riservate** P, R, D, TSA e TRA con orari di attivazione, allarmi di
   prossimità e previsione d'ingresso.
 - **Emergenze**: avarie motore, depressurizzazioni, malori a bordo, avarie
-  radio, con le priorità e il coordinamento che prevede il manuale operativo.
+  radio, con le priorità e il coordinamento previsti dalle procedure ATS.
 - **Etichette integrate** sul modello di quelle reali, con le istruzioni che si
   impartiscono cliccando i campi del tag.
 

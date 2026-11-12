@@ -1,12 +1,12 @@
-// Emergenze sporadiche in rotta (MO-ATS cap. 10): un volo già in contatto dichiara un'avaria sulla nostra
+// Emergenze sporadiche in rotta: un volo già in contatto dichiara un'avaria sulla nostra
 // frequenza e chiede assistenza; la chiamata compare fra i messaggi in alto sul radar.
 // Chiamate radio e righe di stato sono in inglese, come in frequenza; i commenti restano in italiano.
 // Se il volo deve dirottare, il piano cambia di conseguenza: diretto all'aeroporto scelto, nuovo livello
 // d'uscita e nuovo ente successivo, come per una normale uscita dal basso verso l'avvicinamento.
 // Il controllore deve autorizzare la discesa e passare il volo. Se la discesa non arriva, le avarie gravi
-// scendono lo stesso (MO-ATS 10.1.3.2: il pilota naviga come ritiene appropriato e avvisa l'ATC).
+// scendono lo stesso: il pilota naviga come ritiene appropriato e avvisa l'ATC.
 // L'avaria radio (7600) non parla: mantiene livello e velocità per 7 minuti, poi riprende il piano di volo
-// (MO-ATS 10.2.3) e non accetta più istruzioni.
+// e non accetta più istruzioni.
 
 import { airspace, unitAt, sectorAt, distance } from './airspace.js';
 import { bottomTransferFL } from './sectors.js';
@@ -26,7 +26,7 @@ const DIVERT_SMALL_NM = 20;    // penalità per gli aeroporti minori
 
 const fmtFl = (n) => `FL${String(Math.round(n)).padStart(3, '0')}`;
 
-// weight: frequenza relativa; urgency: segnale radiotelefonico (MO-ATS cap. 10 nota 1 e 2): MAYDAY per
+// weight: frequenza relativa; urgency: segnale radiotelefonico: MAYDAY per
 // l'emergenza (codice 7700), PAN PAN per l'urgenza, che ha priorità ma non è un'emergenza e non cambia codice;
 // ownDescentS: secondi dopo i quali il volo scende da solo se non è stato autorizzato (null: aspetta);
 // perf: fattori sulle prestazioni (rateo di discesa, di salita e velocità);

@@ -378,7 +378,7 @@ export class Aircraft {
     return diff > 50 ? 'climb' : diff < -50 ? 'descent' : 'cruise';
   }
 
-  // Avaria radio in contatto: il volo non riceve più istruzioni (MO-ATS 10.2.3), resta solo l'hand-off.
+  // Avaria radio in contatto: il volo non riceve più istruzioni, resta solo l'hand-off.
   get noRadio() {
     return this.control === 'assumed' && this.emergency?.radio === false;
   }
@@ -1314,7 +1314,7 @@ export class Simulation {
       this.stats.handedOff++;
     } else if (ac.emergency) {
       // volo in emergenza: il trasferimento si coordina a voce con l'ente successivo, il livello
-      // è quello imposto dall'avaria (MO-ATS 9.2.4) e non conta come errore. Il messaggio lo scrive
+      // è quello imposto dall'avaria e non conta come errore. Il messaggio lo scrive
       // _updateEmergency, che chiude l'emergenza con una sola riga
     } else {
       this._strike(ac, missed
@@ -1388,7 +1388,7 @@ export class Simulation {
     }
 
     if (!e.radio) {
-      // MO-ATS 10.2.3: livello e velocità assegnati per 7 minuti, poi il livello del piano di volo
+      // livello e velocità assegnati per 7 minuti, poi il livello del piano di volo
       if (e.resumeAt !== null && this.simTime >= e.resumeAt) {
         e.resumeAt = null;
         e.phase = 'resumed';
@@ -1414,7 +1414,7 @@ export class Simulation {
       return;
     }
 
-    // nessuna autorizzazione: l'avaria grave scende comunque (MO-ATS 10.1.3.2)
+    // nessuna autorizzazione: l'avaria grave scende comunque
     if (e.phase === 'requested' && e.ownDescentAt !== null && this.simTime >= e.ownDescentAt) {
       e.phase = 'own';
       ac.assignedAltitude = e.targetFL * 100;
@@ -1522,7 +1522,7 @@ export class Simulation {
   // unable: il controllore ha dato un'istruzione che porta ancora nel temporale.
   _askDeviation(ac, hit, existing = null, { unable = false } = {}) {
     const req = existing ?? { kind: 'deviation' };
-    // cella a meno di un minuto e mezzo: non c'è tempo per chiedere, il pilota devia e avvisa (MO-ATS 7.5.9)
+    // cella a meno di un minuto e mezzo: non c'è tempo per chiedere, il pilota devia e avvisa
     if (hit.t < WX_URGENT_S && !existing) {
       Object.assign(req, this._deviationOption(ac, hit), { cell: hit.cell, askedAt: this.simTime, phase: 'own' });
       ac.request = req;
@@ -1665,7 +1665,7 @@ export class Simulation {
   }
 
   // Livello autorizzato in risposta alla richiesta del pilota: per un volo che esce lateralmente il livello
-  // d'uscita si rivede con il settore successivo (MO-ATS 9.3), e l'hand-off vale sia al nuovo livello sia a
+  // d'uscita si rivede con il settore successivo, e l'hand-off vale sia al nuovo livello sia a
   // quello pianificato.
   _grantLevel(ac, req) {
     this._close(ac, req, levelReplyText(ac, req));
@@ -1747,7 +1747,7 @@ export class Simulation {
         this._close(ac, req, `${ac.callsign} deviation no longer required`);
         return;
       }
-      // senza autorizzazione il pilota devia da solo poco prima di entrarci (MO-ATS 7.5.9), con la prua
+      // senza autorizzazione il pilota devia da solo poco prima di entrarci, con la prua
       // ricalcolata su dove sono le celle adesso
       if (this.simTime >= req.ownAt) {
         Object.assign(req, this._deviationOption(ac, still), { cell: still.cell, phase: 'own', askedAt: this.simTime });
@@ -2138,7 +2138,7 @@ export class Simulation {
 
       if (inside && !ac.areaStrikes.has(inside.id)) {
         ac.areaStrikes.add(inside.id);
-        // un volo in emergenza ha la priorità su ogni altro traffico e sulle zone riservate (MO-ATS 3.6.1.4, 10.1.1.4);
+        // un volo in emergenza ha la priorità su ogni altro traffico e sulle zone riservate;
         // un pilota che devia da solo per un temporale decide lui la prua: non è un errore del controllore
         const ownWx = ac.request?.kind === 'deviation' && ac.request.phase === 'own';
         const fair = this.simTime - ac.offeredAt >= AREA_GRACE_S && !ac.emergency && !ownWx;

@@ -20,7 +20,7 @@ nel repository del progetto e provvedo.
 | Zone P, R, D, TSA, TRA: contorni, limiti verticali, orari | AIP Italia **ENR 5.1** e **ENR 5.2**, ENAV S.p.A. — AIS | `renderer/data/areas.js` |
 | SID, STAR, fix di procedura e piste degli aeroporti italiani | Settore **Aurora di IVAO Italia** (<https://github.com/ivao-italy/it-aurora-sector>) e, per i livelli sui punti iniziali delle STAR, le mappe **TopSky di VATSIM Italia** (<https://github.com/vatsim-italy/VATITA-GNG-Files>) | `renderer/data/procedures.js` |
 | Settorizzazione di Roma ACC e Milano ACC (settori laterali, strati, limiti verticali, punti di coordinamento) | SOP di Roma ACC e di Milano ACC, confrontate con la documentazione pubblica ENAV | `renderer/sectors-roma.js`, `renderer/sectors-milano.js` |
-| Regole di coordinamento, livelli di trasferimento, gestione delle emergenze e delle zone attive | Manuale operativo ENAV **MO-ATS**; regola semicircolare italiana da AIP Italia **ENR 1.7** | `renderer/sim.js`, `renderer/sector-model.js` |
+| Regole di coordinamento, livelli di trasferimento, gestione delle emergenze e delle zone attive | Procedure ATS standard ICAO **Doc 4444 PANS-ATM**; regola semicircolare italiana da AIP Italia **ENR 1.7** | `renderer/sim.js`, `renderer/sector-model.js` |
 | Movimenti commerciali per la composizione del traffico fra aeroporti | Dati pubblici di traffico degli aeroporti italiani | `renderer/world.js`, `renderer/flows.js` |
 
 I dati dell'AIP Italia sono di **ENAV S.p.A.** e restano soggetti alle
