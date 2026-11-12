@@ -1,7 +1,7 @@
 {
   "name": "acs-simulator",
   "productName": "ACS Simulator",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Simulatore di controllo del traffico aereo d'area: i settori reali di Roma ACC e Milano ACC, con traffico, meteo, zone riservate ed emergenze.",
   "author": "ACS Simulator",
   "license": "SEE LICENSE IN LICENSE",
