@@ -21,9 +21,10 @@ che chiedono un livello più alto e, ogni tanto, qualcuno che dichiara emergenza
 
 Tutto quello che si vede è ricostruito su dati reali: i **punti FRA** e i
 confini dalla carta dell'AIP Italia, la **settorizzazione** di Roma ACC e Milano
-ACC dalle loro SOP, le **SID e STAR** degli aeroporti italiani, il traffico
-generato sui flussi veri fra aeroporti con profili di salita e discesa calcolati
-sulle prestazioni di ogni tipo di aeromobile.
+ACC dalle procedure pubbliche di VATSIM Italia, le **SID e STAR** degli
+aeroporti italiani, il traffico generato sui flussi veri fra aeroporti con
+profili di salita e discesa calcolati sulle prestazioni di ogni tipo di
+aeromobile.
 
 ## Gioca online
 
@@ -156,7 +157,7 @@ di compilazione: sono moduli ES caricati direttamente dalla pagina.
 > ENAV S.p.A., da IVAO o da VATSIM.
 
 Le fonti di ogni dato — AIP Italia di ENAV, settore Aurora di IVAO Italia,
-mappe TopSky di VATSIM Italia — sono elencate per esteso in **[CREDITI.md](CREDITI.md)**.
+mappe TopSky e SOP di VATSIM Italia — sono elencate per esteso in **[CREDITI.md](CREDITI.md)**.
 
 ## Segnalazioni
 

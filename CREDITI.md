@@ -19,7 +19,7 @@ nel repository del progetto e provvedo.
 | Punti FRA (nomi, coordinate, tipo), linea di costa, confini degli ACC italiani | AIP Italia **ENR 6.1-3** *Free Route Airspace Chart*, ENAV S.p.A. — AIS, ciclo AIRAC 09 JUL 2026 | `renderer/data/chart.js` |
 | Zone P, R, D, TSA, TRA: contorni, limiti verticali, orari | AIP Italia **ENR 5.1** e **ENR 5.2**, ENAV S.p.A. — AIS | `renderer/data/areas.js` |
 | SID, STAR, fix di procedura e piste degli aeroporti italiani | Settore **Aurora di IVAO Italia** (<https://github.com/ivao-italy/it-aurora-sector>) e, per i livelli sui punti iniziali delle STAR, le mappe **TopSky di VATSIM Italia** (<https://github.com/vatsim-italy/VATITA-GNG-Files>) | `renderer/data/procedures.js` |
-| Settorizzazione di Roma ACC e Milano ACC (settori laterali, strati, limiti verticali, punti di coordinamento) | SOP di Roma ACC e di Milano ACC, confrontate con la documentazione pubblica ENAV | `renderer/sectors-roma.js`, `renderer/sectors-milano.js` |
+| Settorizzazione di Roma ACC e Milano ACC (settori laterali, strati, limiti verticali, punti di coordinamento) | SOP pubbliche di **VATSIM Italia (VATITA)** per Roma ACC e Milano ACC (<https://wiki.vatita.net>), agganciate ai confini della carta AIP | `renderer/sectors-roma.js`, `renderer/sectors-milano.js` |
 | Regole di coordinamento, livelli di trasferimento, gestione delle emergenze e delle zone attive | Procedure ATS standard ICAO **Doc 4444 PANS-ATM**; regola semicircolare italiana da AIP Italia **ENR 1.7** | `renderer/sim.js`, `renderer/sector-model.js` |
 | Movimenti commerciali per la composizione del traffico fra aeroporti | Dati pubblici di traffico degli aeroporti italiani | `renderer/world.js`, `renderer/flows.js` |
 
@@ -28,8 +28,8 @@ condizioni d'uso dell'AIP. Qui sono usati in forma derivata, parziale e
 ridisegnata, a fini didattici e non commerciali, con attribuzione.
 
 I file dei settori IVAO e VATSIM sono pubblicati dalle rispettive comunità
-italiane sotto le licenze indicate nei loro repository: fai riferimento a quelle
-per qualsiasi riutilizzo. Da quei file ACS Simulator estrae soltanto geometrie di
+italiane; i loro repository non indicano una licenza e i diritti restano ai
+rispettivi autori. Da quei file ACS Simulator estrae soltanto geometrie di
 procedura (sequenze di fix, piste, livelli iniziali delle STAR).
 
 Il PDF della carta FRA da cui viene generato `renderer/data/chart.js` **non è
