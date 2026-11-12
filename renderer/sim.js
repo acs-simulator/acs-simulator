@@ -83,7 +83,7 @@ const MOVED_FT = 900;              // un volo ha cambiato livello dall'offerta: 
 // Zone attive (areas.js): previsione lungo rotta e livello autorizzato per i voli di nostra competenza, dal loro
 // ingresso nel settore fino all'hand-off, rifatta ogni AREA_CHECK_EVERY_S secondi.
 const AREA_PREDICT_S = 900;
-const AREA_PREDICT_STEP_S = 10;
+const AREA_PREDICT_STEP_S = 5;      // abbastanza fine da non saltare lo spigolo di una zona piccola
 const AREA_CHECK_EVERY_S = 4;
 const AREA_GRACE_S = 120;          // un volo offerto da meno di così che entra in una zona non è un nostro errore
 const SEED_FIRST_OFFER_S = 20;     // il primo volo iniziale ci viene offerto dopo pochi secondi
@@ -605,6 +605,12 @@ export class Aircraft {
 
 // Il settore considera "nostri" per la separazione i traffici passati o in contatto,
 // e quelli appena trasferiti finché restano nel nostro volume.
+// Copia fuori dal settore lateralmente ma su una rientranza del confine, con l'uscita pianificata ancora davanti
+// (la stessa regola di _updateControl): il volo resta nostro.
+function ghostExcursion(g) {
+  return g.mode === 'route' && g.exitS !== null && (g._along ?? g.alongTrackNm()) < g.exitS - EXCURSION_TOLERANCE_NM;
+}
+
 // Livello a cui l'ente precedente tiene il volo finché non ce lo passa (profilo fermato al livello coordinato).
 function inboundAltitude(ac) {
   const profileFt = Math.round(profileAltitude(ac.profile, ac._along ?? ac.alongTrackNm()) / 100) * 100;
@@ -2061,17 +2067,23 @@ export class Simulation {
     this.stca = pairs;
   }
 
-  // Prima zona attiva in cui il volo entrerebbe proseguendo con rotta (o prua) e livello autorizzato, dal suo
-  // ingresso nel settore finché resta di nostra competenza: fuori lateralmente, oppure arrivato al livello
-  // d'uscita se esce dall'alto o dal basso. Conta l'orario: una zona che si attiva prima del passaggio è attiva.
+  // Prima zona attiva in cui il volo entrerebbe proseguendo con rotta (o prua) e livello autorizzato, finché resta
+  // di nostra competenza: dal suo ingresso nel settore (o da subito, se è già in contatto e ci è già entrato)
+  // finché non esce lateralmente, salvo le uscite temporanee da una rientranza del confine con l'uscita
+  // pianificata ancora davanti. Sono le stesse regole con cui un ingresso in zona conta come errore
+  // (_updateAreas): ciò che non viene previsto non deve poter costare un errore, e viceversa. Conta l'orario:
+  // una zona che si attiva prima del passaggio è attiva.
   // anywhere: per il traffico non nostro, qualunque zona lungo il percorso (senza limitarsi al settore);
   // xfl: ipotesi che il controllore autorizzi subito il volo al livello d'uscita; delayS: il volo comparirà fra
-  // delayS secondi (verifica alla programmazione).
-  _predictArea(ac, candidates, { horizonS = AREA_PREDICT_S, anywhere = false, xfl = false, delayS = 0 } = {}) {
+  // delayS secondi; handoffAtXfl: il volo che esce dall'alto o dal basso si considera passato appena arriva al
+  // livello d'uscita (le tre opzioni servono alla programmazione del traffico). Senza handoffAtXfl il volo resta
+  // nostro finché non lo si passa davvero: autorizzato all'XFL e non ancora passato, se la zona è su quel livello
+  // ci entra, e l'allarme lo deve dire.
+  _predictArea(ac, candidates, { horizonS = AREA_PREDICT_S, anywhere = false, xfl = false, delayS = 0, handoffAtXfl = false } = {}) {
     if (!candidates.length) return null;
     const g = ac.ghost();
     g.xflMode = xfl;
-    let seenInside = anywhere || insideLateral(g);
+    let seenInside = anywhere || insideLateral(g) || (g.control === 'assumed' && g.wasLateral);
     const hit = (t) => {
       for (const area of candidates) {
         if (areaContains(area, g, g.altitude) && isActiveAt(this.areaSchedule, area, this.clockS + delayS + t)) {
@@ -2087,11 +2099,12 @@ export class Simulation {
     for (let t = AREA_PREDICT_STEP_S; t <= horizonS; t += AREA_PREDICT_STEP_S) {
       stepGhost(g, AREA_PREDICT_STEP_S);
       if (anywhere || insideLateral(g)) seenInside = true;
-      else if (seenInside && distanceFromSector(g) > 3) return null;
+      else if (seenInside && distanceFromSector(g) > EXCURSION_TOLERANCE_NM && !ghostExcursion(g)) return null;
       if (!seenInside) continue;
-      if (g.verticalExit && g.clearedFL === g.requestedExitFL && Math.abs(g.altitude - g.requestedExitFL * 100) < 300) return null;
       const found = hit(t);
       if (found) return found;
+      if (handoffAtXfl && g.verticalExit && g.clearedFL === g.requestedExitFL
+        && Math.abs(g.altitude - g.requestedExitFL * 100) < 300) return null;
     }
     return null;
   }
@@ -2115,7 +2128,7 @@ export class Simulation {
     const offerIn = Math.max(0, (plan?.entryInS ?? 0) - OFFER_LEAD_S);
     const horizonS = ours ? Math.min(2400, offerIn + OFFER_LEAD_S + AREA_PREDICT_S) : 1200;
     const candidates = this._areaCandidates(horizonS, delayS);
-    const opts = { horizonS, anywhere: !ours, delayS };
+    const opts = { horizonS, anywhere: !ours, delayS, handoffAtXfl: true };
     // prima del nostro confine il volo è dell'ente precedente, che non lo fa mai entrare in una zona attiva
     if (ours && this._predictArea(ac, candidates, { horizonS: offerIn + OFFER_LEAD_S, anywhere: true, delayS })) {
       this._areaReject = 'before';
@@ -2148,13 +2161,14 @@ export class Simulation {
       area.alarm = false;
     }
 
+    // la previsione si rifà ogni AREA_CHECK_EVERY_S secondi e subito dopo ogni istruzione al volo: cambiato
+    // livello o prua, l'allarme deve seguire la nuova autorizzazione, non quella vecchia
     this._areaTimer -= dt;
+    const due = this._areaTimer <= 0;
+    if (due) this._areaTimer = AREA_CHECK_EVERY_S;
     let candidates = null;
-    if (this._areaTimer <= 0) {
-      this._areaTimer = AREA_CHECK_EVERY_S;
-      candidates = airspace.areas.filter((a) => (this.areaSchedule.get(a.id) ?? [])
-        .some(([s, e]) => s < clock + AREA_PREDICT_S && e > clock));
-    }
+    const areasAhead = () => (candidates ??= airspace.areas.filter((a) => (this.areaSchedule.get(a.id) ?? [])
+      .some(([s, e]) => s < clock + AREA_PREDICT_S && e > clock)));
 
     const apwKeys = new Set();
     for (const ac of this.aircraft) {
@@ -2165,7 +2179,11 @@ export class Simulation {
         continue;
       }
       ac.offeredAt ??= this.simTime;
-      if (candidates) ac.areaConflict = this._predictArea(ac, candidates);
+      if (due || ac._areaSeq !== ac.instrSeq || ac._areaControl !== ac.control) {
+        ac.areaConflict = this._predictArea(ac, areasAhead());
+        ac._areaSeq = ac.instrSeq;
+        ac._areaControl = ac.control;
+      }
 
       // conta dall'ingresso nel settore: prima il volo è ancora sulla rotta scelta dall'ente precedente
       const ourSide = insideLateral(ac) || (ac.control === 'assumed' && ac.wasLateral);

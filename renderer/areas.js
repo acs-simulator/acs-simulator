@@ -90,8 +90,10 @@ export function areaContains(area, p, altFt) {
 }
 
 // Troppo vicino: livello fra i limiti (con margine) e distanza dal confine sotto il minimo, oppure già dentro.
+// Il margine verticale è quello minimo: un volo 500 ft sotto il limite inferiore (FL240 sotto una zona da FL245)
+// o 500 ft sopra quello superiore è separato dalla zona e non fa scattare l'allarme.
 export function areaTooClose(area, p, altFt) {
-  if (altFt < area.lowerFt - AREA_BUFFER_FT || altFt > area.upperFt + AREA_BUFFER_FT) return false;
+  if (altFt <= area.lowerFt - AREA_BUFFER_FT || altFt >= area.upperFt + AREA_BUFFER_FT) return false;
   const b = area.bbox;
   const m = AREA_BUFFER_NM;
   if (p.x < b.xMin - m || p.x > b.xMax + m || p.y < b.yMin - m || p.y > b.yMax + m) return false;
