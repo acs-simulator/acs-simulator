@@ -596,6 +596,12 @@ export class Aircraft {
 
 // Il settore considera "nostri" per la separazione i traffici passati o in contatto,
 // e quelli appena trasferiti finché restano nel nostro volume.
+// Copia fuori dal settore lateralmente ma su una rientranza del confine, con l'uscita pianificata ancora davanti
+// (la stessa regola di _updateControl): il volo resta nostro.
+function ghostExcursion(g) {
+  return g.mode === 'route' && g.exitS !== null && (g._along ?? g.alongTrackNm()) < g.exitS - EXCURSION_TOLERANCE_NM;
+}
+
 // Livello a cui l'ente precedente tiene il volo finché non ce lo passa (profilo fermato al livello coordinato).
 function inboundAltitude(ac) {
   const profileFt = Math.round(profileAltitude(ac.profile, ac._along ?? ac.alongTrackNm()) / 100) * 100;
@@ -650,12 +656,6 @@ function stepGhost(g, dt) {
     g.assignedAltitude = transferredAltitude(g, profileFt, profilePhase(g.profile, g._along));
   }
   g.update(dt);
-}
-
-// Copia fuori dal settore lateralmente ma su una rientranza del confine, con l'uscita pianificata ancora davanti
-// (la stessa regola di _updateControl): il volo resta nostro.
-function ghostExcursion(g) {
-  return g.mode === 'route' && g.exitS !== null && (g._along ?? g.alongTrackNm()) < g.exitS - EXCURSION_TOLERANCE_NM;
 }
 
 // Traiettoria di una copia campionata ogni CONFLICT_STEP_S secondi: x, y e quota per ogni campione.
