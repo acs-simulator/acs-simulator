@@ -142,6 +142,13 @@ npx electron tools/screenshot.mjs
 python3 build/make-icon.py
 ```
 
+L'anteprima dei link condivisi (`site/img/social.jpg`), il video verticale per i social e
+l'immagine quadrata (in `dist/promo/`) si rifanno dal simulatore vero con:
+
+```bash
+npx electron tools/promo-media.mjs
+```
+
 Il codice è in `renderer/`: `sim.js` è il motore (traffico, coordinamento,
 conflitti, zone, meteo, emergenze), `radar.js` disegna, `app.js` tiene insieme
 interfaccia ed eventi, `tutorial.js` è la modalità guidata. Non c'è nessun passo
