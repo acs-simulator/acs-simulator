@@ -1,7 +1,8 @@
 // Banco di prova senza interfaccia: fa girare la simulazione con un "controllore automatico"
 // (hand-on appena il volo è offerto, livello d'uscita autorizzato subito, hand-off al momento giusto)
 // e misura, per ogni settore, il carico medio, le offerte orarie, i minuti di competenza per volo,
-// gli allarmi STCA, gli hand-off sbagliati o mancati e i voli che (senza vettoramenti) entrerebbero in una zona
+// gli allarmi STCA, le perdite di separazione fra voli di altri enti (che quegli enti dovrebbero evitare),
+// gli hand-off sbagliati o mancati e i voli che (senza vettoramenti) entrerebbero in una zona
 // attiva: allarmi di prossimità (apwPerH) e violazioni (areaPerH, di cui areaStrikes contate come errori).
 //
 //   node tools/harness.mjs roma            tutti i settori di Roma ACC
@@ -26,6 +27,20 @@ function nearExit(ac) {
   return fix ? distance(ac, fix) < 6 : false;
 }
 
+// Il volo, proseguendo come autorizzato, perde la separazione con qualcuno nei prossimi sei minuti?
+// (traiettorie previste come le prevedono gli altri enti per risolvere i loro conflitti)
+function conflictAhead(sim, ac) {
+  const mine = sim._resolveTrack(ac);
+  return sim.aircraft.some((other) => {
+    if (other === ac) return false;
+    const t = sim._resolveTrack(other);
+    for (let k = 0; k < Math.min(mine.length, t.length); k += 3) {
+      if (Math.abs(mine[k + 2] - t[k + 2]) < 1000 && Math.hypot(mine[k] - t[k], mine[k + 1] - t[k + 1]) < 5) return true;
+    }
+    return false;
+  });
+}
+
 export function measure(centreId, sectorId, hours = 5, seed = 1) {
   setCentre(centreId);
   loadSector(sectorId);
@@ -48,6 +63,7 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
   let areaStrikes = 0;
   let emergencies = 0;
   let ownDescents = 0;
+  let othersLost = 0;
   const emergencyKinds = {};
   sim.on('event', (e) => {
     if (e.type === 'apw') apw.add(`${e.ac.callsign}|${e.area.id}`);
@@ -60,6 +76,9 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
       emergencyKinds[e.emergency.id] = (emergencyKinds[e.emergency.id] ?? 0) + 1;
     }
     if (e.type === 'emergency-descent') ownDescents++;
+    // perdite fra voli non nostri; quelle fra voli passati già in conflitto sono colpa del controllore
+    // automatico (non separa i voli prima dell'hand-off), non degli altri enti
+    if (e.type === 'loss-other' && !e.a.handedInConflict && !e.b.handedInConflict) othersLost++;
     if (e.type === 'offered') {
       offers++;
       offerTime.set(e.ac, sim.simTime);
@@ -85,7 +104,10 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
       const ready = ac.wasInside && (ac.verticalExit
         ? Math.abs(ac.altitude - ac.requestedExitFL * 100) < 1200
         : (ac.wasLateral && !insideLateral(ac)) || nearExit(ac));
-      if (ready) sim.handOff(ac);
+      if (ready) {
+        ac.handedInConflict = conflictAhead(sim, ac);
+        sim.handOff(ac);
+      }
     }
     const t0 = performance.now();
     sim.tick(DT);
@@ -112,6 +134,8 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     transitMin: +(mean(transits) / 60).toFixed(2),
     handoffs: transits.length,
     stcaPerH: +(conflicts / hours).toFixed(1),
+    othersLostPerH: +(othersLost / hours).toFixed(2),
+    resolutionsPerH: +(sim.resolutions / hours).toFixed(1),
     wrong: wrong.length,
     emergencies,
     emergencyKinds,

@@ -45,6 +45,15 @@ const EXCURSION_TOLERANCE_NM = 3; // uscita pianificata ancora davanti di almeno
 const EXIT_POINT_TOLERANCE_NM = 8; // scostamento laterale massimo dal punto d'uscita quando si lascia il settore
 const XFL_LEVEL_WARN_S = 30;       // uscita dall'alto o dal basso: volo livellato all'XFL e ancora in contatto
 const TRANSFER_BELOW_FT = 2000;    // l'ente inferiore porta subito il volo almeno così sotto il nostro limite
+const TAKEOVER_S = 20;             // dopo l'hand-off l'ente successivo comincia a dare le sue istruzioni
+// Controllori degli altri settori: si accorgono dei conflitti fra i loro voli (o con i nostri) e li risolvono
+// fermando una salita o una discesa, cambiando livello di 1000 ft o, in scia, riducendo la velocità.
+const RESOLVE_EVERY_S = 10;
+const RESOLVE_STEP_S = 10;
+const RESOLVE_LOOKAHEAD_S = 240;   // conflitti risolti con almeno questo anticipo
+const RESOLVE_CHECK_S = 360;       // una soluzione deve tenere separati i due voli per tutto questo tempo
+const RESOLVE_MARGIN_NM = 1.5;     // margine sulla distanza orizzontale: le previsioni non sono perfette
+const RESOLVE_MIN_FT = 6000;       // nessun livello di risoluzione sotto questa quota
 const IN_TRAIL_S = 150;            // separazione temporale minima fra due voli sullo stesso flusso
 const SPAWN_SPACING_NM = 15;
 const DEPARTURE_INTERVAL_S = 110;  // intervallo minimo fra due partenze dallo stesso aeroporto
@@ -649,15 +658,44 @@ function stepGhost(g, dt) {
     const profileFt = Math.round(profileAltitude(g.profile, g._along) / 100) * 100;
     g.assignedAltitude = transferredAltitude(g, profileFt, profilePhase(g.profile, g._along));
   }
+  applyResolution(g);
   g.update(dt);
 }
 
-// Traiettoria di una copia campionata ogni CONFLICT_STEP_S secondi: x, y e quota per ogni campione.
-function sampleTrajectory(ghost, durationS) {
-  const n = Math.floor(durationS / CONFLICT_STEP_S) + 1;
+// Istruzione data da un altro ente per separare il volo (vedi _resolveOthersTick): limite superiore o inferiore
+// al livello e, in scia, velocità ridotta. Si applica sopra il profilo che il volo seguirebbe da solo.
+function applyResolution(ac) {
+  const r = ac.resolution;
+  if (!r) return;
+  if (r.capFt != null) ac.assignedAltitude = Math.min(ac.assignedAltitude, r.capFt);
+  if (r.floorFt != null) ac.assignedAltitude = Math.max(ac.assignedAltitude, r.floorFt);
+  if (r.speedKt != null) {
+    ac.speedMode = 'assigned';
+    ac.assignedMach = null;
+    ac.assignedSpeed = r.speedKt;
+  }
+}
+
+// Primo campione (indice) in cui le due traiettorie sono più vicine di hNm e di 1000 ft, entro maxI; -1 se mai.
+function firstLoss(ta, tb, maxI, hNm = SEP_HORIZONTAL_NM) {
+  const n = Math.min(ta.length, tb.length) / 3;
+  const h2 = hNm * hNm;
+  for (let i = 0; i < Math.min(n, maxI + 1); i++) {
+    const k = i * 3;
+    if (Math.abs(ta[k + 2] - tb[k + 2]) >= SEP_VERTICAL_FT) continue;
+    const dx = ta[k] - tb[k];
+    const dy = ta[k + 1] - tb[k + 1];
+    if (dx * dx + dy * dy < h2) return i;
+  }
+  return -1;
+}
+
+// Traiettoria di una copia campionata ogni stepS secondi: x, y e quota per ogni campione.
+function sampleTrajectory(ghost, durationS, stepS = CONFLICT_STEP_S) {
+  const n = Math.floor(durationS / stepS) + 1;
   const out = new Float64Array(n * 3);
   for (let i = 0; i < n; i++) {
-    if (i > 0) stepGhost(ghost, CONFLICT_STEP_S);
+    if (i > 0) stepGhost(ghost, stepS);
     out[i * 3] = ghost.x;
     out[i * 3 + 1] = ghost.y;
     out[i * 3 + 2] = ghost.altitude;
@@ -720,6 +758,17 @@ export function isConcerned(ac) {
   return ac.control === 'offered' || ac.control === 'assumed' || (ac.control === 'transferred' && insideVolume(ac));
 }
 
+// Voli della cui separazione risponde il giocatore: quelli in contatto; quelli offerti già entrati nel settore
+// (andavano presi); quelli appena passati, finché sono nel settore e volano ancora sulla nostra autorizzazione,
+// e quelli passati con l'allarme STCA già acceso, finché sono nel settore. Fuori da qui la separazione è
+// dell'ente che ha il volo: una perdita fra voli altrui non chiude la partita.
+export function isResponsible(ac, now) {
+  if (ac.control === 'assumed') return true;
+  if (!insideVolume(ac)) return false;
+  if (ac.control === 'offered') return true;
+  return ac.control === 'transferred' && (now - ac.transferredAt <= TAKEOVER_S || !!ac.handedInStca);
+}
+
 export class Simulation {
   // settings: scelte del menu. difficulty: 'facile' | 'media' | 'difficile' (volume di traffico e velocità con
   // cui il settore si riempie); weather: { storms, turbulence, intensity 0-1 }; emergencyPct: percentuale dei
@@ -762,6 +811,9 @@ export class Simulation {
     this.gameOver = null;    // {reason, detail}
     this.stca = [];          // coppie in allarme: {a, b, timeToConflict}
     this._stcaKeys = new Set();
+    this._lossKeys = new Set();   // perdite di separazione in corso fra voli non di nostra competenza
+    this._resolveTimer = 0;
+    this.resolutions = 0;         // conflitti risolti dagli altri enti
     this.schedule = [];         // voli nostri programmati: {plan, spawnAt, offerAt, waitS}
     this.pendingConflicts = []; // voli in conflitto programmati: {plan, spawnAt, offerAt}
     this.listeners = { event: [], gameover: [] };
@@ -1308,6 +1360,8 @@ export class Simulation {
     if (Number.isFinite(lead)) this._handoffLeadS += HANDOFF_LEAD_WEIGHT * (clamp(lead, 0, 900) - this._handoffLeadS);
     ac.control = 'transferred';
     ac.transferredAt = this.simTime;
+    // passato con l'allarme STCA acceso: finché resta nel settore la separazione è ancora nostra
+    ac.handedInStca = !!ac.stca;
     ac.lastInstruction = `Hand-off a ${ac.nextUnit}`;
 
     if (correct) {
@@ -1937,9 +1991,11 @@ export class Simulation {
 
     if (ac.control === 'other') {
       ac.assignedAltitude = profileFt;
+      applyResolution(ac);
     } else if (ac.control === 'inbound' || ac.control === 'offered') {
       // l'ente precedente mantiene il volo sul livello coordinato
       ac.assignedAltitude = coordinatedAltitude(profileFt, ac.clamp, ac.entryFt);
+      applyResolution(ac);
       if (ac.control === 'inbound' && (inside || ((ac.entryS - s) / ac.speed) * 3600 <= OFFER_LEAD_S)) {
         ac.control = 'offered';
         ac.offeredAt = this.simTime;
@@ -1969,9 +2025,10 @@ export class Simulation {
     } else if (ac.control === 'transferred') {
       // l'ente successivo riporta il volo sul suo profilo, sulla rotta e sulla velocità propria
       const elapsed = this.simTime - ac.transferredAt;
-      if (elapsed > 20) ac.assignedAltitude = transferredAltitude(ac, profileFt, profilePhase(ac.profile, s));
+      if (elapsed > TAKEOVER_S) ac.assignedAltitude = transferredAltitude(ac, profileFt, profilePhase(ac.profile, s));
       if (elapsed > 40 && ac.mode === 'heading') ac.resumeOwnNavigation();
       if (elapsed > 40) ac.resumeOwnSpeed();
+      if (elapsed > TAKEOVER_S) applyResolution(ac);
     }
 
     if (lateral && reached) ac.wasLateral = true;
@@ -2149,6 +2206,196 @@ export class Simulation {
     this._apwKeys = apwKeys;
   }
 
+  // --- gli altri enti separano il loro traffico ------------------------------------------------------------------
+  // Ogni RESOLVE_EVERY_S secondi si prevede la traiettoria di tutti i voli (rotta, profilo, autorizzazioni) e,
+  // per ogni conflitto entro RESOLVE_LOOKAHEAD_S in cui c'è almeno un volo di un altro ente, quell'ente lo
+  // risolve cambiando livello o velocità: il traffico di contesto ('other'), i voli che abbiamo passato (l'ente
+  // successivo dà le sue istruzioni dopo TAKEOVER_S) e quelli ancora con l'ente precedente ('inbound'). Questi ultimi
+  // solo per conflitti fuori dal nostro settore e con voli che non sono già nostri: i conflitti dentro il settore
+  // sono il mestiere del giocatore, compresi quelli costruiti apposta per lui. Se l'ente precedente ci offre il
+  // volo prima che la soluzione cada, il volo ci arriva al livello a cui l'ha fermato (un livello d'ingresso
+  // rivisto, come al telefono). I voli in contatto con noi non si toccano mai. Una soluzione resta finché senza
+  // di essa il volo tornerebbe in conflitto.
+  _moverKind(ac) {
+    if (ac.emergency) return null;
+    // un volo appena passato: l'ente successivo può già decidere come separarlo, lo istruirà dopo TAKEOVER_S
+    if (ac.control === 'other' || ac.control === 'inbound' || ac.control === 'transferred') return 'full';
+    if (ac.control === 'offered') return 'keep';   // nessuna nuova soluzione, ma quella in corso resta
+    return null;
+  }
+
+  _resolveTrack(ac, resolution = ac.resolution) {
+    const g = ac.ghost();
+    g.resolution = resolution;
+    if (!resolution?.speedKt && ac.resolution?.speedKt) g.speedMode = 'own';
+    return sampleTrajectory(g, RESOLVE_CHECK_S, RESOLVE_STEP_S);
+  }
+
+  // Indice del primo campione dentro il nostro volume, -1 se mai.
+  static _firstInside(track) {
+    for (let i = 0; i < track.length / 3; i++) {
+      const alt = track[i * 3 + 2];
+      if (alt >= airspace.floorFt && alt < airspace.ceilingFt && insideLateral({ x: track[i * 3], y: track[i * 3 + 1] })) return i;
+    }
+    return -1;
+  }
+
+  // Primo conflitto di una traiettoria con tutte le altre entro maxI: indice del campione, -1 se libera.
+  _firstConflict(ac, track, tracks, maxI, hNm) {
+    let first = -1;
+    for (const [other, t] of tracks) {
+      if (other === ac) continue;
+      const i = firstLoss(track, t, first < 0 ? maxI : first - 1, hNm);
+      if (i >= 0) first = i;
+    }
+    return first;
+  }
+
+  _resolveOthersTick(dt) {
+    this._resolveTimer -= dt;
+    if (this._resolveTimer > 0) return;
+    this._resolveTimer = RESOLVE_EVERY_S;
+
+    const hNm = SEP_HORIZONTAL_NM + RESOLVE_MARGIN_NM;
+    const lookI = RESOLVE_LOOKAHEAD_S / RESOLVE_STEP_S;
+    const checkI = RESOLVE_CHECK_S / RESOLVE_STEP_S;
+    const tracks = new Map(this.aircraft.map((ac) => [ac, this._resolveTrack(ac)]));
+    const byId = new Map(this.aircraft.map((ac) => [ac.id, ac]));
+
+    // soluzioni non più necessarie: senza, il volo non sarebbe in conflitto con nessuno
+    for (const ac of this.aircraft) {
+      if (!ac.resolution) continue;
+      const kind = this._moverKind(ac);
+      if (!kind || !byId.has(ac.resolution.partner)) {
+        this._release(ac, tracks);
+        continue;
+      }
+      const free = this._resolveTrack(ac, null);
+      if (this._firstConflict(ac, free, tracks, checkI, hNm) < 0) this._release(ac, tracks, free);
+    }
+
+    // conflitti previsti con almeno un volo che un altro ente può muovere, dal più vicino
+    const list = [...tracks];
+    const found = [];
+    const reach = 2 * 600 * (RESOLVE_LOOKAHEAD_S / 3600) + hNm;   // oltre, in quattro minuti non si avvicinano
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const [a, ta] = list[i];
+        const [b, tb] = list[j];
+        if (this._moverKind(a) !== 'full' && this._moverKind(b) !== 'full') continue;
+        if (Math.abs(a.x - b.x) > reach || Math.abs(a.y - b.y) > reach) continue;
+        const k = firstLoss(ta, tb, lookI, hNm);
+        if (k >= 0) found.push({ a, b, k });
+      }
+    }
+    found.sort((p, q) => p.k - q.k);
+
+    for (const { a, b } of found) {
+      // una soluzione presa prima per un'altra coppia può aver già risolto anche questa
+      if (firstLoss(tracks.get(a), tracks.get(b), lookI, hNm) < 0) continue;
+      this._resolvePair(a, b, tracks, hNm, lookI, checkI);
+    }
+  }
+
+  _release(ac, tracks, free = null) {
+    const r = ac.resolution;
+    // la velocità torna quella propria, a meno che nel frattempo non l'abbia cambiata il controllore
+    if (r?.speedKt != null && ac.speedMode === 'assigned' && ac.assignedSpeed === r.speedKt) ac.speedMode = 'own';
+    ac.resolution = null;
+    tracks.set(ac, free ?? this._resolveTrack(ac, null));
+  }
+
+  // Soluzioni possibili per il volo m in conflitto con p, dalla più naturale.
+  _resolveOptions(m, p, tracks, hNm, checkI) {
+    if (this._moverKind(m) !== 'full') return [];
+    const tp = tracks.get(p);
+    const tm = tracks.get(m);
+    const k = Math.max(0, firstLoss(tm, tp, checkI, hNm));
+    if (m.control === 'inbound') {
+      // l'ente precedente non tocca i voli che sono già nostri, né risolve conflitti dentro il nostro settore
+      if (OURS.has(p.control) && p.control !== 'inbound') return [];
+      const alt = tm[k * 3 + 2];
+      const inBand = alt >= airspace.floorFt - SEP_VERTICAL_FT && alt < airspace.ceilingFt + SEP_VERTICAL_FT;
+      if (inBand && insideLateral({ x: tm[k * 3], y: tm[k * 3 + 1] })) return [];
+    }
+    const options = [];
+    // quote dell'altro volo fino a un minuto dopo il conflitto
+    let pMin = Infinity;
+    let pMax = -Infinity;
+    for (let i = 0; i <= Math.min(tp.length / 3 - 1, k + 6); i++) {
+      pMin = Math.min(pMin, tp[i * 3 + 2]);
+      pMax = Math.max(pMax, tp[i * 3 + 2]);
+    }
+    const below = Math.floor((pMin - SEP_VERTICAL_FT) / 1000) * 1000;
+    const above = Math.ceil((pMax + SEP_VERTICAL_FT) / 1000) * 1000;
+    const top = m.type.maxFL * 100;
+    const end = tm[tm.length - 1];
+    const goingDown = end < m.altitude - 500;
+    const goingUp = end > m.altitude + 500;
+    const add = (o, delta, inTrend) => options.push({ ...o, cost: Math.abs(delta) - (inTrend ? 3000 : 0) });
+    for (const ft of [below, below - 1000]) {
+      if (ft >= RESOLVE_MIN_FT) add({ capFt: ft }, m.altitude - ft, goingDown || ft >= m.altitude);
+    }
+    for (const ft of [above, above + 1000]) {
+      if (ft <= top) add({ floorFt: ft }, ft - m.altitude, goingUp || ft <= m.altitude);
+    }
+    // fermare la salita o la discesa al livello che sta attraversando
+    const here = Math.round(m.altitude / 1000) * 1000;
+    if (goingUp && here >= RESOLVE_MIN_FT) add({ capFt: here }, 1500, true);
+    if (goingDown && here <= top) add({ floorFt: here }, 1500, true);
+    // velocità: più lento (per passare dietro o restare in scia) o più veloce (per passare davanti)
+    const { min, max } = speedEnvelope(m.type, m.altitude);
+    const slow = Math.round(Math.max(min, m.speed - 40));
+    const fast = Math.round(Math.min(max, m.speed + 30));
+    if (slow < m.speed - 15) options.push({ speedKt: slow, cost: 4000 });
+    if (fast > m.speed + 15) options.push({ speedKt: fast, cost: 4500 });
+    // l'ente precedente non ci consegna il volo fuori dalla fascia del settore
+    const fits = (o) => m.control !== 'inbound'
+      || ((o.capFt == null || o.capFt >= airspace.floorFt) && (o.floorFt == null || o.floorFt < airspace.ceilingFt));
+    return options.filter(fits).map((o) => ({ m, p, o }));
+  }
+
+  _resolvePair(a, b, tracks, hNm, lookI, checkI) {
+    const candidates = [
+      ...this._resolveOptions(a, b, tracks, hNm, checkI),
+      ...this._resolveOptions(b, a, tracks, hNm, checkI),
+    ].sort((x, y) => x.o.cost - y.o.cost);
+
+    let best = null;
+    for (const { m, p, o } of candidates) {
+      const resolution = { capFt: o.capFt ?? null, floorFt: o.floorFt ?? null, speedKt: o.speedKt ?? null, partner: p.id };
+      const track = this._resolveTrack(m, resolution);
+      // il traffico degli altri non viene mandato dentro il nostro settore
+      if (Simulation._firstInside(tracks.get(m)) < 0 && Simulation._firstInside(track) >= 0) continue;
+      if (firstLoss(track, tracks.get(p), checkI, hNm) >= 0) continue;
+      const first = this._firstConflict(m, track, tracks, checkI, hNm);
+      // libera, o con un conflitto tanto lontano da poterlo risolvere più avanti
+      if (first < 0 || first > lookI) {
+        this._apply(m, resolution, track, tracks);
+        return true;
+      }
+      // altrimenti si tiene la soluzione che rimanda di più il prossimo conflitto, purché lo rimandi davvero
+      const now = this._firstConflict(m, tracks.get(m), tracks, checkI, hNm);
+      if (first > now + 3 && (!best || first > best.first)) best = { m, resolution, track, first };
+    }
+    if (best) {
+      this._apply(best.m, best.resolution, best.track, tracks);
+      return true;
+    }
+    return false;
+  }
+
+  _apply(m, resolution, track, tracks) {
+    const old = m.resolution;
+    if (old?.speedKt != null && resolution.speedKt == null && m.speedMode === 'assigned' && m.assignedSpeed === old.speedKt) {
+      m.speedMode = 'own';
+    }
+    // l'istruzione si applica a ogni passo in _updateControl (per un volo appena passato, dopo TAKEOVER_S)
+    m.resolution = resolution;
+    tracks.set(m, track);
+    this.resolutions++;
+  }
+
   tick(dtRealSeconds) {
     if (this.paused || this.gameOver) return;
     const dt = dtRealSeconds * this.timeMultiplier;
@@ -2180,18 +2427,32 @@ export class Simulation {
     }
     this._emergencyTick();
 
+    this._resolveOthersTick(dt);
+
     for (const ac of this.aircraft) ac.conflict = false;
+    const losses = new Set();
     for (let i = 0; i < this.aircraft.length; i++) {
       for (let j = i + 1; j < this.aircraft.length; j++) {
         const a = this.aircraft[i];
         const b = this.aircraft[j];
         if (distance(a, b) < SEP_HORIZONTAL_NM && Math.abs(a.altitude - b.altitude) < SEP_VERTICAL_FT) {
+          // in rosso sul radar in ogni caso; la partita finisce solo se uno dei due è di nostra competenza.
+          // Una perdita cominciata fra voli altrui resta loro finché la separazione non torna, anche se nel
+          // frattempo uno dei due ci viene offerto o entra nel settore: ce l'hanno consegnato così
           a.conflict = true;
           b.conflict = true;
-          if (isConcerned(a) || isConcerned(b)) this._endGame('separation', { a, b });
+          const key = `${Math.min(a.id, b.id)}-${Math.max(a.id, b.id)}`;
+          const inherited = this._lossKeys.has(key);
+          if (!inherited && (isResponsible(a, this.simTime) || isResponsible(b, this.simTime))) {
+            this._endGame('separation', { a, b });
+            continue;
+          }
+          losses.add(key);
+          if (!inherited) this._emit('event', { type: 'loss-other', a, b });
         }
       }
     }
+    this._lossKeys = losses;
 
     this._updateStca();
     this._updateAreas(dt);
