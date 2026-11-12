@@ -6,7 +6,7 @@ import { airspace, waypoint, insideLateral, inView, unitAt, sectorAt } from './a
 import { levelsForTrack, topTransferFL, bottomTransferFL } from './sectors.js';
 import {
   pickType, requestedLevels, makeProfile, profileAltitude, profileSpeed, profileTime, distanceBefore,
-  sectorPassage, passageReenters, pointAlong, resolveExit, entryStart, MIN_INSIDE_NM, LEVEL_BEFORE_NM,
+  sectorPassage, passageReenters, pointAlong, resolveExit, entryStart, profilePhase, MIN_INSIDE_NM, LEVEL_BEFORE_NM,
 } from './flows.js';
 import { bearing, distance, segmentIntersection } from './geo.js';
 
@@ -15,6 +15,7 @@ const EDGE_MAX_S = 1500;            // i voli da lontano compaiono al bordo del 
 const MIN_LEAD_S = 120;            // nessun volo compare a ridosso del confine del settore
 const DEPARTURE_NM = [4, 7];       // le partenze compaiono sul radar pochi NM dopo il decollo
 const EXIT_COP_SNAP_NM = 25;
+const LEVEL_OFF_S = 60;            // un arrivo ci viene offerto livellato (o in discesa) da almeno così
 const MIN_VERTICAL_FL = 20;        // uscita dall'alto o dal basso: almeno 2000 ft fra livello d'ingresso e XFL
 const NEAR_PATH_NM = 3;            // flussi che passano così vicino alla traiettoria del bersaglio (stessa rotta)
 const FLOW_SPREAD = 0.75;          // appiattisce i pesi dei flussi: rotte più varie, non solo le più trafficate
@@ -168,6 +169,30 @@ function coordinate(flow, type, profile, passage, routeIdx) {
     clamp = later < entry.alt - 100 ? 'descend' : 'climb';
     prevUnit = unitAt(pointAlong(flow, Math.max(0, entry.s - 15)), entry.alt);
   }
+  // Volo che nel nostro settore deve scendere (arrivo) ma che, sui collegamenti brevi, al momento dell'offerta
+  // starebbe ancora salendo verso il livello di crociera: l'ente precedente non ce lo passa in salita. Ferma la
+  // salita al livello raggiunto un minuto prima dell'offerta (crociera ridotta, come si fa davvero sulle tratte
+  // corte) e ce lo consegna livellato; se quel livello non sta nel nostro settore, il volo non passa da noi.
+  let capFt = null;
+  const descends = exit.kind === 'bottom' || exit.kind === 'star' || requestedFL < entryFL;
+  if (descends) {
+    if (entry.kind === 'below') return null;
+    const sOffer = distanceBefore(profile, entry.s, OFFER_LEAD_S + LEVEL_OFF_S);
+    let climbing = false;
+    for (let s = sOffer; s < entry.s && !climbing; s += 2) climbing = profilePhase(profile, s) === 'climb';
+    if (climbing) {
+      const reached = profileAltitude(profile, sOffer);
+      if (clamp === 'climb') {
+        const capped = levels.filter((fl) => fl * 100 <= reached + 200 && fl <= entryFL);
+        if (!capped.length) return null;
+        entryFL = capped[capped.length - 1];
+        if (exit.kind !== 'lateral' && entryFL < requestedFL) return null;
+      } else {
+        if (reached < entryFL * 100 - 300) return null;
+        capFt = Math.max(entryFL * 100, Math.floor(reached / 1000) * 1000);
+      }
+    }
+  }
   // volo che entra già a ridosso del limite che sta per attraversare: l'ente precedente lo passa direttamente
   // al settore superiore o inferiore, senza passare da noi
   if ((exit.kind === 'top' || exit.kind === 'bottom') && Math.abs(requestedFL - entryFL) < MIN_VERTICAL_FL) return null;
@@ -181,6 +206,7 @@ function coordinate(flow, type, profile, passage, routeIdx) {
     routeLimitFix,
     prevUnit,
     entryFt: entryFL * 100,
+    capFt,
     entryKind: entry.kind,
     entryFix: entry.fix ?? null,
     clamp,
@@ -221,19 +247,25 @@ function planFlight(flow, type, cruiseFL, sSpawn, perf = aircraftVariation()) {
 }
 
 // Livello a cui l'ente precedente mantiene il volo prima di passarcelo.
-export function coordinatedAltitude(profileFt, clamp, entryFt) {
-  return clamp === 'descend' ? Math.max(profileFt, entryFt) : Math.min(profileFt, entryFt);
+// capFt: livello a cui l'ente precedente ferma la salita di un arrivo che non farebbe in tempo a livellare.
+// climbing: il profilo è ancora in salita. Un volo che ci arriverà in discesa ma è appena decollato sale
+// lungo il profilo: il livello coordinato vale solo da quando comincia a scendere.
+export function coordinatedAltitude(profileFt, clamp, entryFt, capFt = null, climbing = false) {
+  const ft = capFt === null ? profileFt : Math.min(profileFt, capFt);
+  if (clamp !== 'descend') return Math.min(ft, entryFt);
+  return climbing ? ft : Math.max(ft, entryFt);
 }
 
 function inboundPlan(planned, coord) {
   const { base } = planned;
-  const ft = coordinatedAltitude(base.altitude, coord.clamp, coord.entryFt);
+  const climbing = profilePhase(base.profile, base.flow.total - routeLengthNm(base, base.route)) === 'climb';
+  const ft = coordinatedAltitude(base.altitude, coord.clamp, coord.entryFt, coord.capFt, climbing);
   return { ...base, ...coord, control: 'inbound', altitude: ft, assignedAltitude: ft };
 }
 
 const COORD_KEYS = [
   'exitFix', 'exitKind', 'requestedExitFL', 'nextUnit', 'nextUnitCode', 'routeLimitFix', 'prevUnit', 'entryFt', 'entryKind',
-  'entryFix', 'clamp', 'entryS', 'exitS',
+  'entryFix', 'clamp', 'entryS', 'exitS', 'capFt',
 ];
 
 // Nuovo volo di nostra competenza. Le partenze da aeroporti visibili compaiono pochi NM dopo il decollo,
@@ -356,7 +388,10 @@ function coordinationVariants(flow, type, cruiseFL, coord, alt) {
   const variants = [coord];
   if (!levels.length) return variants;
   const L = nearestLevel(levels, alt);
-  if (coord.entryKind === 'lateral' && L * 100 !== coord.entryFt && Math.abs(L * 100 - coord.entryFt) <= 2000) {
+  // (mai più alto per chi nel settore deve scendere: non ci verrebbe passato in salita)
+  const arrival = coord.exitKind === 'bottom' || coord.exitKind === 'star' || coord.requestedExitFL * 100 < coord.entryFt;
+  if (coord.entryKind === 'lateral' && L * 100 !== coord.entryFt && Math.abs(L * 100 - coord.entryFt) <= 2000
+    && !(arrival && L * 100 > coord.entryFt) && !(coord.exitKind === 'star' && L < coord.requestedExitFL)) {
     variants.push({ ...coord, entryFt: L * 100 });
   }
   if (coord.exitKind === 'lateral' && L !== coord.requestedExitFL && Math.abs(L - coord.requestedExitFL) <= 20) {

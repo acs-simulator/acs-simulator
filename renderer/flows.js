@@ -145,6 +145,7 @@ function pathLength(points) {
 }
 
 const SID_MAX_DETOUR = 0.35;  // allungamento massimo dovuto alla SID o alla STAR, in frazione della distanza diretta
+const FINAL_MAX_TURN = 110;   // virata massima per allinearsi al finale dall'ultimo punto della STAR
 const SID_MAX_TURN = 100;     // virata massima fra l'ultimo tratto della SID e la rotta verso la destinazione
 
 // SID delle piste in uso che porta il volo verso la destinazione con il minor allungamento.
@@ -263,8 +264,17 @@ function buildFlow(A, o, d, viewClip) {
     if (maxTurn(points).deg > MAX_TURN_DEG + 10) return null;
   }
 
+  // SID: salita iniziale sull'asse della pista in uso, poi i punti pubblicati. STAR: dall'ultimo punto
+  // pubblicato al finale della pista in uso (se la virata per allinearsi è ragionevole).
+  const first = sid && o.depFix ? [o.depFix] : [];
+  const last = [];
+  if (star && d.finalFix) {
+    const end = tail[tail.length - 1];
+    const turn = Math.abs(angleDiff(bearing(d.finalFix, d), bearing(end, d.finalFix)));
+    if (distance(end, d.finalFix) > 3 && distance(end, d) > distance(d.finalFix, d) * 0.6 && turn <= FINAL_MAX_TURN) last.push(d.finalFix);
+  }
   const points = [o];
-  for (const p of [...head, ...seq.map((k) => k.w), ...tail, d]) {
+  for (const p of [...first, ...head, ...seq.map((k) => k.w), ...tail, ...last, d]) {
     if (p !== points[points.length - 1]) points.push(p);
   }
   const cum = [0];

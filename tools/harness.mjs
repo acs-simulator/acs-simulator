@@ -1,7 +1,9 @@
 // Banco di prova senza interfaccia: fa girare la simulazione con un "controllore automatico"
 // (hand-on appena il volo è offerto, livello d'uscita autorizzato subito, hand-off al momento giusto)
 // e misura, per ogni settore, il carico medio, le offerte orarie, i minuti di competenza per volo,
-// gli allarmi STCA, gli hand-off sbagliati o mancati e i voli che (senza vettoramenti) entrerebbero in una zona
+// gli allarmi STCA, i conflitti programmati consegnati (plannedPerH) e quelli che senza interventi si presentano
+// davvero (plannedRealPerH), gli arrivi offerti ancora in salita (climbingArrivals: deve restare 0),
+// gli hand-off sbagliati o mancati e i voli che (senza vettoramenti) entrerebbero in una zona
 // attiva: allarmi di prossimità (apwPerH) e violazioni (areaPerH, di cui areaStrikes contate come errori).
 //
 //   node tools/harness.mjs roma            tutti i settori di Roma ACC
@@ -48,6 +50,9 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
   let areaStrikes = 0;
   let emergencies = 0;
   let ownDescents = 0;
+  let climbingArrivals = 0;   // arrivi (devono scendere nel settore) offerti mentre stanno ancora salendo
+  const planned = new Map();  // voli consegnati in conflitto programmato -> bersaglio
+  let plannedReal = 0;        // ...il cui conflitto, senza interventi, si è presentato davvero (allarme STCA)
   const emergencyKinds = {};
   sim.on('event', (e) => {
     if (e.type === 'apw') apw.add(`${e.ac.callsign}|${e.area.id}`);
@@ -61,6 +66,11 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     }
     if (e.type === 'emergency-descent') ownDescents++;
     if (e.type === 'offered') {
+      const { ac } = e;
+      const descends = ac.exitKind === 'bottom' || ac.exitKind === 'star' || ac.requestedExitFL * 100 < ac.entryFt;
+      // (chi ha deviato per un temporale può dover ancora livellare al primo livello sopra: meno di 1000 ft)
+      if (descends && ac.assignedAltitude > ac.altitude + 1000) climbingArrivals++;
+      if (ac.plannedConflict) planned.set(ac.id, ac.plannedConflict.targetId);
       offers++;
       offerTime.set(e.ac, sim.simTime);
     }
@@ -96,6 +106,7 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
       if (!seen.has(key)) {
         seen.add(key);
         conflicts++;
+        if (planned.get(p.a.id) === p.b.id || planned.get(p.b.id) === p.a.id) plannedReal++;
       }
     }
     loadSum += sim.aircraft.filter((a) => a.control === 'offered' || a.control === 'assumed').length;
@@ -112,6 +123,9 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     transitMin: +(mean(transits) / 60).toFixed(2),
     handoffs: transits.length,
     stcaPerH: +(conflicts / hours).toFixed(1),
+    plannedPerH: +(planned.size / hours).toFixed(1),
+    plannedRealPerH: +(plannedReal / hours).toFixed(1),
+    climbingArrivals,
     wrong: wrong.length,
     emergencies,
     emergencyKinds,
