@@ -60,8 +60,8 @@ export const SOURCES = [
   },
   {
     what: 'Settorizzazione e procedure di coordinamento',
-    who: 'SOP di Roma ACC e Milano ACC e procedure ICAO PANS-ATM (Doc 4444)',
-    url: '',
+    who: 'SOP pubbliche di VATSIM Italia (VATITA) e procedure ICAO PANS-ATM (Doc 4444)',
+    url: 'https://wiki.vatita.net',
   },
 ];
 

@@ -26,7 +26,7 @@ export const COLORS = {
 export const MAP_BG = '#050b12';
 const HALO = 'rgba(5, 11, 18, 0.85)';
 
-// Label Integrata ENAV. I campi dipendono da quello che fa il volo (livellato, oppure in salita o in discesa)
+// Label integrata. I campi dipendono da quello che fa il volo (livellato, oppure in salita o in discesa)
 // e dal passaggio del mouse; tre righe da livellato, quattro in salita o discesa. fullLabel: voli di nostra
 // competenza, per cui il livello autorizzato è il nostro.
 export function fullLabel(ac) {
@@ -1023,7 +1023,7 @@ function drawAircraft(ctx, t, ac, now) {
     ctx.globalAlpha = 1;
     return;
   }
-  // Label Integrata (ENAV), come sugli schermi di Roma ACC. Colonne fisse di un carattere:
+  // Label integrata. Colonne fisse di un carattere:
   //   0-2       3     4-8       10-12
   //   CALLSIGN                  HDG         (HDG solo col mouse sopra)
   //   LEV       ↑↓    EFX         VR
@@ -1122,7 +1122,7 @@ function drawAircraft(ctx, t, ac, now) {
 
 const LABEL_FONT = '13px monospace';
 const NAME_FONT = 'bold 13px monospace';
-const DOWNLINK = '#45c8ee';                   // dati letti da bordo (ciano, come sugli schermi ENAV)
+const DOWNLINK = '#45c8ee';                   // dati letti da bordo (ciano)
 const XFL_NEAR_FT = 2000;                     // livello arancione a meno di 2000 ft dal livello di passaggio
 const MISMATCH = '#ff9f40';                   // livello selezionato a bordo diverso dall'autorizzato
 const XFL_COLOR = '#d68cff';                  // livello d'uscita
@@ -1228,7 +1228,7 @@ function speedField(ac, color) {
   return { text: mach ? fmtMach(ac.speed / soundSpeedKt(ac.altitude)) : pad3(ac.speed), color: DOWNLINK };
 }
 
-// Righe della label, sullo schema della Label Integrata (colonne di un carattere):
+// Righe della label, sullo schema della label integrata (colonne di un carattere):
 //   CALLSIGN          HDG           HDG col mouse sopra, oppure assegnata (vettoramento)
 //   LEV ↑  EFX        VR            freccia e VR solo in salita o discesa
 //   SPD w/t ALV       NXT           ALV col mouse sopra o in salita/discesa; NXT col mouse sopra
