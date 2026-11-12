@@ -83,8 +83,8 @@ const MOVED_FT = 900;              // un volo ha cambiato livello dall'offerta: 
 // Zone attive (areas.js): previsione lungo rotta e livello autorizzato per i voli di nostra competenza, dal loro
 // ingresso nel settore fino all'hand-off, rifatta ogni AREA_CHECK_EVERY_S secondi.
 const AREA_PREDICT_S = 900;
-const AREA_PREDICT_STEP_S = 5;      // abbastanza fine da non saltare lo spigolo di una zona piccola
-const AREA_CHECK_EVERY_S = 4;
+const AREA_PREDICT_STEP_S = 10;     // più il punto a metà fra due campioni: non si salta lo spigolo di una zona piccola
+const AREA_CHECK_EVERY_S = 6;      // e subito dopo ogni istruzione al volo
 const AREA_GRACE_S = 120;          // un volo offerto da meno di così che entra in una zona non è un nostro errore
 const SEED_FIRST_OFFER_S = 20;     // il primo volo iniziale ci viene offerto dopo pochi secondi
 const SEED_ASSUMED_SHARE = 0.35;   // voli iniziali già in contatto all'avvio, appena fuori dal confine
@@ -2045,12 +2045,16 @@ export class Simulation {
   _updateStca() {
     const pairs = [];
     for (const ac of this.aircraft) ac.stca = false;
-    const relevant = (ac) => OURS.has(ac.control) || isConcerned(ac);
+    // di competenza: calcolato una volta per volo (isConcerned guarda il poligono del settore), non per coppia
+    const relevant = this.aircraft.map((ac) => OURS.has(ac.control) || isConcerned(ac));
     for (let i = 0; i < this.aircraft.length; i++) {
       for (let j = i + 1; j < this.aircraft.length; j++) {
         const a = this.aircraft[i];
         const b = this.aircraft[j];
-        if (!relevant(a) && !relevant(b)) continue;
+        if (!relevant[i] && !relevant[j]) continue;
+        // troppo lontani per arrivare sotto i 5 NM entro STCA_S, qualunque sia la prua: risultato identico, meno calcoli
+        const reach = SEP_HORIZONTAL_NM + ((a.speed + b.speed) * STCA_S) / 3600;
+        if (Math.abs(a.x - b.x) > reach || Math.abs(a.y - b.y) > reach) continue;
         const t = pairConflictTime(a, b, STCA_S);
         if (t === null) continue;
         a.stca = true;
@@ -2084,24 +2088,27 @@ export class Simulation {
     const g = ac.ghost();
     g.xflMode = xfl;
     let seenInside = anywhere || insideLateral(g) || (g.control === 'assumed' && g.wasLateral);
-    const hit = (t) => {
+    const hit = (p, alt, t) => {
       for (const area of candidates) {
-        if (areaContains(area, g, g.altitude) && isActiveAt(this.areaSchedule, area, this.clockS + delayS + t)) {
-          return { area, t, x: g.x, y: g.y, altFt: g.altitude };
+        if (areaContains(area, p, alt) && isActiveAt(this.areaSchedule, area, this.clockS + delayS + t)) {
+          return { area, t, x: p.x, y: p.y, altFt: alt };
         }
       }
       return null;
     };
     if (seenInside) {
-      const now = hit(0);
+      const now = hit(g, g.altitude, 0);
       if (now) return now;
     }
     for (let t = AREA_PREDICT_STEP_S; t <= horizonS; t += AREA_PREDICT_STEP_S) {
+      const prev = { x: g.x, y: g.y, alt: g.altitude };
       stepGhost(g, AREA_PREDICT_STEP_S);
       if (anywhere || insideLateral(g)) seenInside = true;
       else if (seenInside && distanceFromSector(g) > EXCURSION_TOLERANCE_NM && !ghostExcursion(g)) return null;
       if (!seenInside) continue;
-      const found = hit(t);
+      // prima il punto a metà del passo (in linea retta: in dieci secondi il volo vira poco), poi il campione
+      const mid = { x: (prev.x + g.x) / 2, y: (prev.y + g.y) / 2 };
+      const found = hit(mid, (prev.alt + g.altitude) / 2, t - AREA_PREDICT_STEP_S / 2) ?? hit(g, g.altitude, t);
       if (found) return found;
       if (handoffAtXfl && g.verticalExit && g.clearedFL === g.requestedExitFL
         && Math.abs(g.altitude - g.requestedExitFL * 100) < 300) return null;

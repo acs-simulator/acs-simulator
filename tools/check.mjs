@@ -145,6 +145,38 @@ const { measure } = await import(`${ROOT}/tools/harness.mjs`);
 const { DIFFICULTY } = await import(`${R}/sector-model.js`);
 const { CENTRES } = await import(`${R}/sectors.js`);
 
+// Il tempo di calcolo dipende dal computer: i server di GitHub sono due o tre volte più lenti di un Mac recente.
+// Un calcolo di prova sempre uguale misura la velocità della macchina e la soglia si allarga di conseguenza
+// (mai sotto i 5 ms): un peggioramento della simulazione si vede ovunque, un computer lento non fa fallire.
+const TICK_LIMIT_MS = 5;
+const BENCH_REF_MS = 20;   // il calcolo di prova su un Mac Apple Silicon recente
+function benchMs() {
+  let best = Infinity;
+  for (let r = 0; r < 5; r++) {
+    const t0 = performance.now();
+    const a = new Float64Array(3000);
+    let acc = 0;
+    for (let k = 0; k < 200; k++) {
+      for (let i = 0; i < a.length; i++) {
+        const x = Math.sin(i * 0.01 + k) * 50;
+        const y = Math.cos(i * 0.02 - k) * 50;
+        a[i] = Math.hypot(x, y) + Math.atan2(y, x);
+        acc += a[i];
+      }
+      const objs = [];
+      for (let i = 0; i < 200; i++) objs.push({ id: i, v: a[(i * 7 + k) % a.length] });
+      objs.sort((p, q) => p.v - q.v);
+      acc += objs[0].v;
+    }
+    best = Math.min(best, performance.now() - t0);
+    if (!Number.isFinite(acc)) throw new Error('calcolo di prova non valido');
+  }
+  return best;
+}
+const speed = Math.max(1, benchMs() / BENCH_REF_MS);
+const tickLimit = TICK_LIMIT_MS * speed;
+console.log(`  velocità della macchina: ${speed.toFixed(2)}× più lenta del riferimento, soglia di calcolo ${tickLimit.toFixed(1)} ms`);
+
 const CASES = [['roma', 'NWA'], ['roma', 'OVB'], ['milano', CENTRES[1].sectors[0].id]];
 for (const [centre, id] of CASES) {
   const sector = CENTRES.find((c) => c.id === centre).sectors.find((s) => s.id === id);
@@ -165,7 +197,7 @@ for (const [centre, id] of CASES) {
   // il conto oscilla (anche 2 all'ora in una prova sola): la soglia guarda le derive vere, non il caso
   check(`${id}: gli altri enti separano il loro traffico`, r.othersLostPerH <= 2.5,
     `${r.othersLostPerH} perdite di separazione all'ora fra voli non nostri (soglia 2,5)`);
-  check(`${id}: calcolo fluido`, r.tickMsAvg < 5, `${r.tickMsAvg} ms per passo`);
+  check(`${id}: calcolo fluido`, r.tickMsAvg < tickLimit, `${r.tickMsAvg} ms per passo (soglia ${tickLimit.toFixed(1)} ms)`);
 }
 
 // --- esito -------------------------------------------------------------------
