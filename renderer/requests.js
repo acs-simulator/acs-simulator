@@ -1,5 +1,5 @@
-// Richieste dei piloti sulla frequenza: cambi di livello di crociera (MO-ATS 3.9.5, 4.2.3.7) e deviazioni
-// per evitare i temporali (MO-ATS 7.5.9). Arrivano come messaggi in alto sul radar e restano lì finché il
+// Richieste dei piloti sulla frequenza: cambi di livello di crociera e deviazioni
+// per evitare i temporali. Arrivano come messaggi in alto sul radar e restano lì finché il
 // controllore risponde: si autorizza dando il livello, la prua o il diretto chiesti.
 // Chiamate radio e righe di stato sono in inglese, come in frequenza; i commenti restano in italiano.
 // Se la deviazione dal maltempo non arriva in tempo il pilota devia lo stesso, avvisando: è quello che

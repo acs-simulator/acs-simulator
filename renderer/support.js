@@ -60,7 +60,7 @@ export const SOURCES = [
   },
   {
     what: 'Settorizzazione e procedure di coordinamento',
-    who: 'SOP di Roma ACC e Milano ACC e manuale ENAV MO-ATS',
+    who: 'SOP di Roma ACC e Milano ACC e procedure ICAO PANS-ATM (Doc 4444)',
     url: '',
   },
 ];
