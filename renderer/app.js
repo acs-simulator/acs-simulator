@@ -1,7 +1,7 @@
 import { Simulation, MAX_STRIKES } from './sim.js';
 import {
   render, makeTransform, measureAt, radarView, resetView, panBy, zoomTo, ZOOM_RANGE, tagVisible, TAG_FL_RANGE,
-  rotateTag, freeTag, waypointShown, VECTOR_RANGE, deconflictTags, tagFieldAt, tagNameAt, cpaAt, labelAt, setHovered, labelBlock,
+  rotateTag, freeTag, waypointShown, VECTOR_RANGE, deconflictTags, tagFieldAt, tagNameAt, cpaAt, labelAt, setHovered, labelBlock, MONO,
 } from './radar.js';
 import {
   AREA_KINDS, areaBand, fmtClock, isActiveAt, currentOrNextWindow, PREACTIVE_S,
@@ -280,10 +280,10 @@ function drawStartMap() {
     const lon = s.polygon.reduce((a, p) => a + p[1], 0) / s.polygon.length;
     const [x, y] = toPx([lat, lon]);
     const hover = s.id === hoveredSector;
-    c.font = '11px monospace';
+    c.font = `11px ${MONO}`;
     c.fillStyle = hover ? '#7CFC9A' : 'rgba(215, 230, 234, 0.6)';
     c.fillText(s.name.replace(/ (ALTO|MEDIO|BASSO)$/, ''), x, y);
-    c.font = '11px monospace';
+    c.font = `11px ${MONO}`;
     c.fillStyle = hover ? '#7CFC9A' : 'rgba(110, 200, 255, 0.7)';
     c.fillText(fmtBand(s.floorFL, s.ceilingFL), x, y + 13);
   }
@@ -532,6 +532,74 @@ function startGame(sectorId, settings = sessionSettings(), lesson = null) {
   $('start-screen').classList.add('hidden');
   $('gameover').classList.add('hidden');
   $('lesson-done').classList.add('hidden');
+  // nel browser la partita va a schermo intero con Esc trattenuto dal gioco, dove il browser lo consente
+  if (canLockEscape()) enterFullscreen();
+}
+
+// --- blocco durante la partita (versione nel browser) ------------------------------------------------------------
+// Nel browser Esc, a schermo intero, fa uscire dallo schermo intero, e i tasti laterali del mouse o un ctrl+W
+// fanno lasciare la pagina. Durante una partita: Esc è del gioco (preventDefault), Chrome, Edge e Opera
+// trattengono Esc anche a schermo intero con il Keyboard Lock (per uscire lo si tiene premuto due secondi),
+// e prima di lasciare la pagina il browser chiede conferma. Safari e Firefox non hanno il Keyboard Lock: lì lo
+// schermo intero si sceglie a mano e il clic destro fa quello che fa Esc. Nell'applicazione da scaricare non
+// serve niente di tutto questo: la finestra è sua.
+const IN_BROWSER = !window.acs;
+
+function sessionRunning() {
+  return !!sim && !sim.gameOver && $('start-screen').classList.contains('hidden')
+    && $('gameover').classList.contains('hidden') && $('lesson-done').classList.contains('hidden');
+}
+
+const fullscreenElement = () => document.fullscreenElement ?? document.webkitFullscreenElement ?? null;
+const fullscreenEnabled = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+const canLockEscape = () => IN_BROWSER && fullscreenEnabled() && typeof navigator.keyboard?.lock === 'function';
+
+function enterFullscreen() {
+  const el = document.documentElement;
+  const request = el.requestFullscreen ?? el.webkitRequestFullscreen;
+  if (!request || fullscreenElement()) return;
+  try {
+    // senza un clic dell'utente il browser rifiuta: non è un errore, si resta in finestra
+    Promise.resolve(request.call(el)).catch(() => {});
+  } catch { /* come sopra */ }
+}
+
+function exitFullscreen() {
+  const exit = document.exitFullscreen ?? document.webkitExitFullscreen;
+  if (exit && fullscreenElement()) Promise.resolve(exit.call(document)).catch(() => {});
+}
+
+function syncFullscreen() {
+  const on = !!fullscreenElement();
+  if (on && canLockEscape()) navigator.keyboard.lock(['Escape']).catch(() => {});
+  else if (!on && navigator.keyboard?.unlock) navigator.keyboard.unlock();
+  const btn = $('fullscreen-btn');
+  btn.setAttribute('aria-pressed', String(on));
+  btn.title = on
+    ? (canLockEscape() ? 'Esci dallo schermo intero (o tieni premuto Esc)' : 'Esci dallo schermo intero (Esc)')
+    : 'Schermo intero';
+}
+
+if (IN_BROWSER && fullscreenEnabled()) {
+  $('fullscreen-btn').classList.remove('hidden');
+  $('fullscreen-btn').addEventListener('click', () => {
+    if (fullscreenElement()) {
+      exitFullscreen();
+      return;
+    }
+    enterFullscreen();
+    if (!canLockEscape()) toast('In this browser Esc leaves full screen: press Q (or right-click) to cancel tools', 'info');
+  });
+  document.addEventListener('fullscreenchange', syncFullscreen);
+  document.addEventListener('webkitfullscreenchange', syncFullscreen);
+}
+
+if (IN_BROWSER) {
+  window.addEventListener('beforeunload', (ev) => {
+    if (!sessionRunning()) return;
+    ev.preventDefault();
+    ev.returnValue = '';
+  });
 }
 
 function showGameOver(over) {
@@ -1032,14 +1100,32 @@ window.addEventListener('keydown', (ev) => {
     setTool(tool === 'cpa' ? null : 'cpa');
     return;
   }
+  if ((ev.key === '+' || ev.key === '=' || ev.key === '-') && !typing && sim && !ev.ctrlKey && !ev.metaKey) {
+    zoomTo(canvas, radarView.zoom * (ev.key === '-' ? 1 / 1.25 : 1.25));
+    syncRadarMenu();
+    return;
+  }
+  // Q fa quello che fa Esc: nel browser Esc a schermo intero esce dallo schermo intero (Safari e Firefox non lo
+  // lasciano trattenere), Q invece resta sempre al gioco
+  if ((ev.key === 'q' || ev.key === 'Q') && !typing && sim && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+    cancelAction();
+    return;
+  }
   if (ev.key !== 'Escape') return;
+  // durante la partita Esc è del gioco: nel browser non deve fare altro (vedi anche il blocco dello schermo intero)
+  if (sessionRunning()) ev.preventDefault();
+  cancelAction();
+});
+
+// Esc, Q oppure clic destro senza trascinare: chiude la prima cosa aperta, dalla più in primo piano.
+function cancelAction() {
   if (aboutOpen()) showAbout(false);
   else if (helpOpen()) showHelp(false);
   else if (tagMenu) closeTagMenu();
   else if (popupOpen()) showPopup(null);
   else if (tool) setTool(null);
   else labelPanel.deselect();
-});
+}
 
 // --- menu a tendina sui valori del tag -------------------------------------
 // Un clic sul livello o sulla velocità scritti nel tag di un volo in contatto apre l'elenco dei valori
@@ -1290,41 +1376,127 @@ $('view-reset').addEventListener('click', () => {
   syncRadarMenu();
 });
 
-// Trackpad: strisciando con due dita la mappa si sposta, pizzicando (ctrlKey) si ingrandisce attorno al cursore.
+// Rotella e trackpad. Con un mouse la rotella ingrandisce attorno al cursore (come sulle mappe); sul trackpad
+// strisciando con due dita la mappa si sposta e pizzicando (ctrlKey) si ingrandisce. Lo stesso evento 'wheel'
+// arriva da entrambi: si riconoscono dai valori. Un mouse manda scatti grandi e solo verticali (in righe su
+// Firefox, multipli di 4,000244 px su Mac, 100 o 120 px circa su Windows e Linux), il trackpad un flusso continuo
+// di valori piccoli, spesso anche orizzontali. Il primo evento di una sequenza decide, il resto della sequenza
+// (inerzia del trackpad compresa) segue la stessa strada.
+const MAC_WHEEL_STEP = 4.000244140625;
+const WHEEL_GAP_MS = 200;          // pausa che chiude una sequenza di eventi della rotella
+const WHEEL_ZOOM_STEP = 1.2;       // ingrandimento per scatto della rotella
+let wheelKind = null;
+let wheelAt = 0;
+
+function wheelSource(ev, mode) {
+  const now = performance.now();
+  const sameGesture = now - wheelAt < WHEEL_GAP_MS;
+  wheelAt = now;
+  if (sameGesture && wheelKind) return wheelKind;
+  const dx = Math.abs(ev.deltaX);
+  const dy = Math.abs(ev.deltaY);
+  const steps = dy / MAC_WHEEL_STEP;
+  let mouse;
+  if (mode !== 0) mouse = true;
+  else if (dx > 0 || dy === 0) mouse = false;
+  else if (Math.abs(steps - Math.round(steps)) < 1e-6) mouse = true;
+  else mouse = dy >= 40;
+  wheelKind = mouse ? 'mouse' : 'trackpad';
+  return wheelKind;
+}
+
+// Scatti della rotella contenuti in un evento (con segno: positivo = verso l'utente, cioè rimpicciolire).
+function wheelNotches(ev, mode) {
+  const dy = ev.deltaY;
+  if (mode === 1) return dy / 3;          // righe (Firefox): tre per scatto
+  if (mode === 2) return dy;              // pagine
+  const steps = Math.abs(dy) / MAC_WHEEL_STEP;
+  if (Math.abs(steps - Math.round(steps)) < 1e-6) return Math.sign(dy) * Math.min(steps, 3);
+  return Math.sign(dy) * Math.max(1, Math.abs(dy) / 100);
+}
+
+let gestureZoom = null;   // Safari: zoom all'inizio del pizzico
+
 canvas.addEventListener('wheel', (ev) => {
+  // Firefox: deltaMode va letto prima di deltaX e deltaY, altrimenti converte gli scatti del mouse in pixel
+  const mode = ev.deltaMode;
   if (!sim) return;
   ev.preventDefault();
-  const unit = ev.deltaMode === 1 ? 16 : 1;
   closeTagMenu();
-  if (ev.ctrlKey) {
-    const { x, y } = cssPoint(ev);
-    zoomTo(canvas, radarView.zoom * Math.exp(-ev.deltaY * unit * 0.01), x, y);
+  const { x, y } = cssPoint(ev);
+  const source = wheelSource(ev, mode);
+  if (source === 'mouse') {
+    const n = Math.max(-3, Math.min(3, wheelNotches(ev, mode)));
+    zoomTo(canvas, radarView.zoom * WHEEL_ZOOM_STEP ** -n, x, y);
+    syncRadarMenu();
+  } else if (ev.ctrlKey) {
+    if (gestureZoom !== null) return;   // Safari pizzica con i suoi eventi (sotto)
+    zoomTo(canvas, radarView.zoom * Math.exp(-ev.deltaY * 0.01), x, y);
     syncRadarMenu();
   } else {
+    const unit = mode === 1 ? 16 : 1;
     panBy(canvas, -ev.deltaX * unit, -ev.deltaY * unit);
   }
 }, { passive: false });
 
-// Due dita premute sul trackpad (clic secondario), tasto destro o centrale: trascinando si sposta la mappa.
+// Safari non manda il pizzico come rotella con ctrl ma come gesto: lo si ferma su tutta la pagina (altrimenti
+// ingrandirebbe l'interfaccia) e sul radar diventa lo zoom. Chrome e Firefox, sopra il radar, mandano ctrl +
+// rotella anche sulle finestre in sovrimpressione: lì non deve ingrandire la pagina.
+for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(type, (ev) => {
+    if (!sim || $('start-screen') && !$('start-screen').classList.contains('hidden')) return;
+    ev.preventDefault();
+    if (ev.target !== canvas && type !== 'gestureend') return;
+    if (type === 'gesturestart') gestureZoom = radarView.zoom;
+    else if (type === 'gestureend') gestureZoom = null;
+    else if (gestureZoom !== null) {
+      const { x, y } = cssPoint(ev);
+      zoomTo(canvas, gestureZoom * ev.scale, x, y);
+      syncRadarMenu();
+    }
+  }, { passive: false });
+}
+$('radar-pane').addEventListener('wheel', (ev) => {
+  if (sim && ev.ctrlKey && ev.target !== canvas) ev.preventDefault();
+}, { passive: false });
+
+// Trascinando con il tasto destro o centrale (sul trackpad: due dita premute) si sposta la mappa. Un clic destro
+// senza trascinare (su Mac anche ctrl+clic) fa quello che fa Esc: chiude il menu o lo strumento, poi deseleziona.
 let panState = null;
+let panEndedAt = 0;
 canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+// rilasciando il tasto destro fuori dal radar Windows aprirebbe il menu contestuale della pagina
+window.addEventListener('contextmenu', (ev) => {
+  if (sim && (panState || performance.now() - panEndedAt < 400)) ev.preventDefault();
+});
 canvas.addEventListener('mousedown', (ev) => {
-  if (!sim || ev.button === 0) return;
+  if (!sim || (ev.button === 0 && !ev.ctrlKey) || ev.button > 2) return;
+  // il clic centrale su Windows attiverebbe lo scorrimento automatico del browser
   ev.preventDefault();
-  panState = cssPoint(ev);
+  const p = cssPoint(ev);
+  panState = { ...p, startX: p.x, startY: p.y, moved: false, secondary: ev.button === 2 || ev.ctrlKey };
 });
 window.addEventListener('mousemove', (ev) => {
   if (!panState) return;
-  if ((ev.buttons & 6) === 0) {
+  if ((ev.buttons & 7) === 0) {
     panState = null;
     return;
   }
   const p = cssPoint(ev);
+  if (!panState.moved && Math.hypot(p.x - panState.startX, p.y - panState.startY) <= 4) return;
+  panState.moved = true;
   panBy(canvas, p.x - panState.x, p.y - panState.y);
-  panState = p;
+  panState.x = p.x;
+  panState.y = p.y;
 });
 window.addEventListener('mouseup', (ev) => {
-  if (ev.button !== 0) panState = null;
+  // tasti laterali del mouse (indietro e avanti): durante la sessione non fanno lasciare la pagina
+  if (sessionRunning() && (ev.button === 3 || ev.button === 4)) ev.preventDefault();
+  if (!panState) return;
+  const state = panState;
+  panState = null;
+  panEndedAt = performance.now();
+  if (!state.moved && state.secondary) cancelAction();
 });
 
 syncRadarMenu();

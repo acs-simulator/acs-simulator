@@ -56,11 +56,11 @@
       </section>
       <div id="coach-warp" class="hidden">⏩ avanti veloce…</div>
       <div id="radar-tools" role="toolbar" aria-label="Strumenti del radar">
-        <button id="tool-cpa" aria-pressed="false" title="CPA (C): clic su due aerei. Distanza minima, minuti, separazione verticale">
+        <button id="tool-cpa" aria-pressed="false" title="CPA (C): clic su due aerei. Distanza minima, minuti, separazione verticale. Q per uscire">
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M2 4 L9 9 M18 4 L11 9 M2 16 L9 11 M18 16 L11 11" /><circle cx="10" cy="10" r="1.6" /></svg>
           CPA
         </button>
-        <button id="tool-rb" aria-pressed="false" title="R&amp;B (R): clic su inizio e fine. Rilevamento nei due versi e distanza">
+        <button id="tool-rb" aria-pressed="false" title="R&amp;B (R): clic su inizio e fine. Rilevamento nei due versi e distanza. Q per uscire">
           <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="16" r="1.8" /><circle cx="16" cy="4" r="1.8" /><path d="M5.5 14.5 L14.5 5.5" /></svg>
           R&amp;B
         </button>
@@ -133,6 +133,9 @@
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8 h10 v4.5 a4 4 0 0 1 -4 4 h-2 a4 4 0 0 1 -4 -4 Z M14 9.5 h1.2 a2.2 2.2 0 0 1 0 4.4 h-1.6 M7 2.5 c-0.8 1 0.8 2 0 3 M10.5 2.5 c-0.8 1 0.8 2 0 3" /></svg>
             </button>
             <button id="help-btn" class="icon-btn" title="Comandi del radar (H)" aria-label="Comandi del radar">?</button>
+            <button id="fullscreen-btn" class="icon-btn hidden" title="Schermo intero" aria-label="Schermo intero" aria-pressed="false">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8 V3 H8 M12 3 H17 V8 M17 12 V17 H12 M8 17 H3 V12" /></svg>
+            </button>
             <button id="change-sector" title="Torna alla scelta del settore">Cambia</button>
           </div>
         </div>
@@ -318,7 +321,7 @@
                 simulatore vero, con il traffico preparato apposta e nessun errore che chiude la partita.</li>
               <li><b class="c-yellow">Giallo</b> non in contatto · <b class="c-magenta">magenta</b> passato a te: clicca il tag per l'hand-on. Un clic sul tag seleziona il volo e ne mostra la rotta; le istruzioni si danno cliccando i campi della label · <b class="c-green">verde</b> in contatto.</li>
               <li>L'uscita dipende dal livello finale del volo. Chi <b>sale</b> oltre il limite superiore si autorizza al livello più alto del settore e si passa al settore superiore <b>mentre si avvicina</b> a quel livello (tag <b>X190 ↑NWM</b>); chi <b>scende</b> verso l'aeroporto si autorizza al livello più basso e si passa al settore inferiore o all'APP (tag <b>X100 ↓APP</b>). Nei settori bassi, se la <b>STAR</b> dell'aeroporto di destinazione comincia nel settore, l'arrivo va portato al livello di trasferimento e passato all'APP <b>prima del punto iniziale della STAR</b> (tag <b>X180 VALMA</b>); le partenze vengono consegnate dall'APP sul <b>punto finale della SID</b>, sotto il limite inferiore del settore. Chi resta <b>livellato</b> esce dal suo <b>punto di coordinamento</b> (COP, cerchiato sul radar) al livello richiesto. L'hand-off si fa con la <b>barra spaziatrice</b> sul volo selezionato, o dal pulsante HAND-OFF della label.</li>
-              <li>Radar: ogni aereo è un punto con la scia delle posizioni precedenti, una ogni 12 secondi (più sono distanziate, più è veloce). Sul tag dei voli in contatto, un <b>clic sul livello o sulla velocità</b> apre l'elenco dei valori di 10 in 10: sceglierne uno impartisce subito l'istruzione, senza aprire l'etichetta. <b>Clic</b> sulla traccia: il tag ruota di 45° in senso orario, con la linea guida sempre della stessa lunghezza (i tag possono sovrapporsi, si sistemano a mano o tutti insieme una volta con <b>Deconflitta tag</b> nel menu Tag in basso; trascinandoli la distanza dalla traccia diventa libera, un clic sulla traccia la riporta fissa). Dove una traccia verde o magenta è vicina a una gialla, il clic va a quella di competenza. <b>Doppio clic sul nominativo</b>: vettore velocità (minuti regolabili con il cursore in basso; zoom e filtro dei tag per livello nella stessa barra). Trascina con <b>due dita</b> per spostare la mappa. In basso: <b>CPA</b> (clic su due aerei: distanza minima, minuti, separazione verticale), <b>R&amp;B</b> (due clic, inizio e fine: distanza e rilevamento nei due versi), cursore del <b>Vettore</b> velocità e menu <b>Mappa</b> con i filtri dei punti e delle zone non attive.</li>
+              <li>Radar: ogni aereo è un punto con la scia delle posizioni precedenti, una ogni 12 secondi (più sono distanziate, più è veloce). Sul tag dei voli in contatto, un <b>clic sul livello o sulla velocità</b> apre l'elenco dei valori di 10 in 10: sceglierne uno impartisce subito l'istruzione, senza aprire l'etichetta. <b>Clic</b> sulla traccia: il tag ruota di 45° in senso orario, con la linea guida sempre della stessa lunghezza (i tag possono sovrapporsi, si sistemano a mano o tutti insieme una volta con <b>Deconflitta tag</b> nel menu Tag in basso; trascinandoli la distanza dalla traccia diventa libera, un clic sulla traccia la riporta fissa). Dove una traccia verde o magenta è vicina a una gialla, il clic va a quella di competenza. <b>Doppio clic sul nominativo</b>: vettore velocità (minuti regolabili con il cursore in basso; zoom e filtro dei tag per livello nella stessa barra). Rotella del mouse o pizzico sul trackpad per lo zoom; tasto destro trascinando (o due dita sul trackpad) per spostare la mappa. In basso: <b>CPA</b> (clic su due aerei: distanza minima, minuti, separazione verticale), <b>R&amp;B</b> (due clic, inizio e fine: distanza e rilevamento nei due versi), cursore del <b>Vettore</b> velocità e menu <b>Mappa</b> con i filtri dei punti e delle zone non attive.</li>
               <li>Semicircolare italiana: rotta 090°–269° livelli <b>dispari</b>, 270°–089° livelli <b>pari</b>.</li>
               <li>Strati: <b>alti</b> da FL305 in crociera. Sotto, a <b>Roma ACC</b> i <b>medi</b> da FL195 a FL305 e i <b>bassi</b> fino a FL195, con gli arrivi da consegnare all'APP verso FL90-100 o sul punto iniziale della STAR; a <b>Milano ACC</b> un solo strato <b>basso</b> dall'avvicinamento a FL305, perché lì gli avvicinamenti salgono fino a FL145-FL155 e gli arrivi si consegnano a FL140-FL150. Le partenze compaiono dopo il decollo, gli altri voli dal bordo del radar.</li>
               <li><b>Zone</b> (P, R, D, TSA, TRA): si attivano e si disattivano durante la partita, orari nel menu <b>Zone attive</b>. Attive in <b>grigio</b>, non si attraversano: vettora o cambia livello. Se un volo in contatto vi entrerà con rotta e livello autorizzato la zona diventa <b>rosso tenue</b> e accanto al nominativo compare un <b>asterisco rosso</b>: cliccandolo vedi la rotta, il punto d'ingresso, l'ora e fra quanto; troppo vicino: contorno più marcato e volo rosso.</li>
@@ -438,8 +441,8 @@
           <h3>Traffico ed etichette</h3>
           <ul>
             <li><b>Clic sul tag</b>: seleziona il volo (traccia cerchiata e rotta celeste) e fa l'hand-on del traffico magenta.</li>
-            <li><b>Esc</b> o un clic sulla mappa vuota: deseleziona. Dove una label copre la traccia di un altro volo, il clic va alla label.</li>
-            <li><b>Barra spaziatrice</b>: hand-off del volo selezionato, come il pulsante HAND-OFF del pannello (non serve aprirlo). <b>Esc</b> esce anche dallo strumento attivo.</li>
+            <li><b>Esc</b> o <b>Q</b>, un <b>clic destro</b> (su Mac anche ctrl+clic) o un clic sulla mappa vuota: deseleziona. Dove una label copre la traccia di un altro volo, il clic va alla label.</li>
+            <li><b>Barra spaziatrice</b>: hand-off del volo selezionato, come il pulsante HAND-OFF del pannello (non serve aprirlo). <b>Esc</b>, <b>Q</b> o il clic destro escono anche dallo strumento attivo e chiudono i menu.</li>
             <li><b>Clic su HDG, EFX, VR, ALV o SPD</b> nella label di un volo in contatto: elenco dei valori, l'istruzione parte subito.</li>
             <li><b>Mouse sopra</b> una traccia o una label: la label si evidenzia in grigio e si vede completa, anche per il traffico non in contatto.</li>
             <li><b>Clic sulla traccia</b>: il tag ruota di 45° in senso orario, con la linea guida sempre della stessa lunghezza; dopo un trascinamento la distanza è libera finché non si clicca di nuovo la traccia. Fra una traccia verde o magenta e una gialla vicine, il clic va a quella di competenza. I tag si possono anche trascinare e sovrapporre; <b>Deconflitta tag</b> nel menu <b>Tag</b> in basso li sistema tutti una volta sola.</li>
@@ -449,11 +452,14 @@
         <section>
           <h3>Misure e mappa</h3>
           <ul>
-            <li><b>R&amp;B</b> (range and bearing, pulsante in basso a sinistra o tasto <b>R</b>): clic sul punto d'inizio e poi su quello di fine, anche su un aereo (la linea lo segue). Sulla linea: rilevamento nei due versi e distanza, per esempio <b>121/301 119 NM</b>. Un clic sull'etichetta della linea la toglie; <b>Esc</b> annulla la linea in corso e spegne lo strumento.</li>
+            <li><b>R&amp;B</b> (range and bearing, pulsante in basso a sinistra o tasto <b>R</b>): clic sul punto d'inizio e poi su quello di fine, anche su un aereo (la linea lo segue). Sulla linea: rilevamento nei due versi e distanza, per esempio <b>121/301 119 NM</b>. Un clic sull'etichetta della linea la toglie; <b>Esc</b> o <b>Q</b> annullano la linea in corso e spengono lo strumento.</li>
             <li><b>CPA</b> (tasto <b>C</b>): clic su due aerei. Con prua, velocità e livello autorizzato attuali: distanza minima, minuti e separazione verticale in quel punto, per esempio <b>14 NM 13 MIN 6000 FT</b> (rosso se sotto 5 NM e 1000 ft). Un clic sull'etichetta la toglie.</li>
             <li><b>Vettore</b> (cursore in basso): lunghezza in minuti del vettore velocità.</li>
             <li><b>Mappa</b> (in basso): menu dei filtri: punti FRA tutti con il nome, solo i punti d'uscita (COP) o solo i simboli, se mostrare le zone non attive e le <b>STAR</b> (linee continue verdi, nome sul punto iniziale) e le <b>SID</b> (tratteggiate ambra, nome sul punto finale) delle piste in uso negli aeroporti visibili.</li>
-            <li><b>Due dita premute</b> (o tasto destro) trascinando, oppure strisciata a due dita: sposta la mappa. <b>Pizzica</b> o usa lo zoom nella barra in basso (il mirino ricentra sul settore).</li>
+            <li><b>Mouse</b>: la <b>rotella</b> ingrandisce attorno al cursore; trascinando con il <b>tasto destro</b> o con quello centrale la mappa si sposta.</li>
+            <li><b>Trackpad</b>: strisciata a due dita (o due dita premute trascinando) per spostare la mappa, <b>pizzica</b> per lo zoom.</li>
+            <li>Zoom anche con i tasti <b>+</b> e <b>−</b> e con la barra in basso; il mirino ricentra sul settore.</li>
+            <li>Nel browser il pulsante <b>schermo intero</b> in alto a destra toglie le barre del browser. Su Chrome, Edge e Opera la partita parte già a schermo intero ed Esc resta al gioco: per uscire dallo schermo intero si tiene premuto Esc. Su Safari e Firefox Esc a schermo intero esce dallo schermo intero: per chiudere strumenti e menu usa <b>Q</b>, che funziona sempre. Durante la partita il browser chiede conferma prima di chiudere o lasciare la pagina.</li>
             
             <li>Menu <b>Tag</b> in basso: il filtro dei livelli nasconde solo le etichette del traffico non di competenza, le tracce restano sempre. All'apertura di un settore parte sui suoi livelli con 5 FL di margine.</li>
           </ul>

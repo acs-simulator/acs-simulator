@@ -147,8 +147,9 @@ export const LESSONS = [
       {
         title: 'Muovi la vista',
         text: `La vista è tua: il traffico non si ferma, ma puoi guardare dove vuoi.<br>
-          <b>Pizzica</b> o usa i tasti <b>+</b> e <b>−</b> in basso per lo zoom, trascina con <b>due dita</b>
-          per spostare la mappa, e il <b>mirino</b> riporta tutto al centro del settore.`,
+          Per lo zoom: <b>rotella</b> del mouse, <b>pizzico</b> sul trackpad o i tasti <b>+</b> e <b>−</b> in basso.
+          Per spostare la mappa: trascina con il <b>tasto destro</b> o, sul trackpad, con <b>due dita</b>.
+          Il <b>mirino</b> riporta tutto al centro del settore.`,
         goal: 'Ingrandisci la vista, poi premi il mirino per ricentrare',
         hint: 'I comandi dello zoom sono nella barra in basso, a destra del cursore “Vettore”.',
         focus: () => ({ dom: '.tool-zoom' }),
@@ -226,7 +227,7 @@ export const LESSONS = [
         text: (c) => `<b>${c.mem.ac?.callsign ?? 'Il volo'}</b> è verde: sei tu il responsabile della sua
           separazione finché non lo passerai all'ente successivo.<br><br>
           Il tag è anche <b>selezionato</b>: la traccia è cerchiata e sul radar vedi la sua <b>rotta</b>
-          in celeste, con i punti che toccherà. Un clic sulla mappa vuota (o <b>Esc</b>) deseleziona.`,
+          in celeste, con i punti che toccherà. Un clic sulla mappa vuota (o <b>Esc</b>, <b>Q</b> o un clic destro) deseleziona.`,
         focus: (c) => (alive(c.sim, c.mem.ac) ? { ac: c.mem.ac } : null),
       },
       {
@@ -516,7 +517,8 @@ export const LESSONS = [
         text: `<b>CPA</b> (tasto <b>C</b> o pulsante in basso) risponde alla domanda "questi due si toccano?":
           clicca su due aerei e ti dice la <b>distanza minima</b>, fra <b>quanti minuti</b> e con che
           <b>separazione verticale</b> — per esempio <b>14 NM 13 MIN 6000 FT</b>, in rosso se sotto i minimi.<br><br>
-          Accanto c'è <b>R&amp;B</b> (tasto <b>R</b>): due clic qualsiasi, e leggi distanza e rilevamento.`,
+          Accanto c'è <b>R&amp;B</b> (tasto <b>R</b>): due clic qualsiasi, e leggi distanza e rilevamento.
+          Per spegnere lo strumento premi <b>Q</b> (o Esc).`,
         goal: 'Accendi CPA e clicca due aerei',
         hint: 'Premi C, poi un clic su una traccia e un clic su un\'altra. Un clic sull\'etichetta della misura la cancella.',
         focus: () => ({ dom: '#tool-cpa' }),
