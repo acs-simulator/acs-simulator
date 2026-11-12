@@ -490,6 +490,8 @@ function startGame(sectorId, settings = sessionSettings(), lesson = null) {
     if (type === 'handoff' && !correct && !event.emergency) toast(`✗ ${ac.callsign} transferred at ${fmtFl(ac.clearedFL)}, not ${fmtFl(ac.requestedExitFL)} (${sim.strikes.length}/${MAX_STRIKES})`, 'error');
     if (type === 'missed' && !event.emergency) toast(`✗ ${ac.callsign} left the sector without hand-off (${sim.strikes.length}/${MAX_STRIKES})`, 'error');
     if (type === 'stca') toast(`⚠ STCA ${event.a.callsign} – ${event.b.callsign}: separation lost in ${Math.max(0, Math.round(event.t))} s`, 'error');
+    // perdita fra voli non nostri: si vede in rosso sul radar, ma non è un errore del giocatore
+    if (type === 'loss-other') toast(`${event.a.callsign} – ${event.b.callsign}: separation lost outside your responsibility`, 'warn');
     if (type === 'offpoint') toast(`✗ ${ac.callsign} left wide of ${ac.exitFix} (${sim.strikes.length}/${MAX_STRIKES})`, 'error');
     if (type === 'xfl-revised') toast(`${ac.callsign} XFL revised ${fmtFl(ac.requestedExitFL)}, coordinated with ${ac.nextUnit}`, 'ok');
     if (type === 'xfl-level') toast(`⚠ ${ac.callsign} level at ${fmtFl(ac.requestedExitFL)}: transfer to ${ac.nextUnit}`, 'warn');
