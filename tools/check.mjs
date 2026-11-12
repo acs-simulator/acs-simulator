@@ -4,7 +4,8 @@
 //   2. il link del sostegno è configurato (altrimenti il pulsante non comparirebbe)
 //   3. le lezioni della modalità guidata sono ben formate
 //   4. la simulazione è ancora in bilancio: carico nella fascia della difficoltà, nessun hand-off
-//      sbagliato dal "controllore automatico", tempo di calcolo per passo sotto soglia
+//      sbagliato dal "controllore automatico", tempo di calcolo per passo sotto soglia, nessun arrivo
+//      offerto in salita, conflitti programmati consegnati e reali
 //
 // Il punto 4 fa girare il banco di prova (tools/harness.mjs) con un seme fisso, quindi è ripetibile:
 // se un cambiamento sposta il bilanciamento del traffico, qui si vede.
@@ -160,6 +161,12 @@ for (const [centre, id] of CASES) {
   check(`${id}: hand-off corretti`, wrongRate < 0.1,
     `${r.wrong} sbagliati su ${r.handoffs} (${Math.round(wrongRate * 100)}%, soglia 10%)`);
   check(`${id}: calcolo fluido`, r.tickMsAvg < 5, `${r.tickMsAvg} ms per passo`);
+  // un volo che nel settore deve scendere non viene mai passato mentre sta ancora salendo
+  check(`${id}: nessun arrivo offerto in salita`, r.climbingArrivals === 0, `${r.climbingArrivals} arrivi offerti in salita`);
+  // i conflitti programmati vengono consegnati e, senza interventi, si presentano davvero
+  check(`${id}: conflitti programmati consegnati`, r.plannedPerH >= 2, `${r.plannedPerH} all'ora`);
+  check(`${id}: conflitti programmati reali`, r.plannedRealPerH >= r.plannedPerH * 0.6,
+    `${r.plannedRealPerH} reali su ${r.plannedPerH} consegnati all'ora`);
 }
 
 // --- esito -------------------------------------------------------------------
