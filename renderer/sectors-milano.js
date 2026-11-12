@@ -2,7 +2,7 @@
 // Milano ACC lavora la parte occidentale della FIR/UIR di Milano: Piemonte, Valle d'Aosta, Lombardia,
 // Liguria ed Emilia occidentale, fino ai confini con Francia (Marsiglia), Svizzera (Ginevra e Zurigo),
 // Padova ACC a est e Roma ACC a sud.
-// La divisione orizzontale è quella ufficiale dei moduli di Milano ACC (briefing e SOP di Milano ACC,
+// La divisione orizzontale è quella dei moduli di Milano ACC pubblicata da VATITA (SOP Milano di VATSIM Italia,
 // VATITA - wiki.vatita.net, edizione 1.3 gennaio 2026): EN, WN, WS, ES. I poligoni sono georeferenziati
 // sugli aeroporti della carta dei settori (19 punti di appoggio, errore medio 0,5 NM) e il confine sud è
 // esattamente quello usato per Roma ACC, così i due ACC combaciano.
@@ -22,7 +22,7 @@
 // simulatore, che arrivano a FL305, usano comunque questo confine più esteso, così Verona e Brescia (il
 // modulo ES0 di Milano ACC) restano di competenza.
 // Nessuna delle sette configurazioni pubblicate prevede uno strato intermedio: i "settori medi" a Milano
-// non esistono (verificato sulla SOP e sulle tabelle DFL - Division Flight Levels - degli ACC confinanti:
+// non esistono (verificato sulla SOP di VATITA e sulle tabelle DFL - Division Flight Levels - degli ACC confinanti:
 // Roma ha il blocco 1 da MEL a FL285, Padova ha un livello a FL195 solo nei moduli centrali e meridionali).
 // Passaggi fra strati come nelle procedure reali: chi sale viene consegnato al livello più alto del proprio
 // settore (FL300/290), chi scende al più basso (FL310/320, FL150/140 all'APP).
