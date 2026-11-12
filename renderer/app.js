@@ -1213,6 +1213,8 @@ function syncRadarMenu() {
   $('zoom-value').textContent = zoomPct;
   $('vector-value').textContent = `${radarView.vectorMin} min`;
   $('vector-range').value = String(radarView.vectorMin);
+  $('vector-down').disabled = radarView.vectorMin <= VECTOR_RANGE[0];
+  $('vector-up').disabled = radarView.vectorMin >= VECTOR_RANGE[1];
   const { tagMinFL: lo, tagMaxFL: hi } = radarView;
   $('tagfl-min').value = String(lo);
   $('tagfl-max').value = String(hi);
@@ -1257,10 +1259,14 @@ $('tagfl-all').addEventListener('click', () => setTagFilter(...TAG_FL_RANGE));
 // Cursore del vettore velocità, nella barra in basso.
 $('vector-range').min = String(VECTOR_RANGE[0]);
 $('vector-range').max = String(VECTOR_RANGE[1]);
-$('vector-range').addEventListener('input', (ev) => {
-  radarView.vectorMin = Number(ev.target.value);
+function setVector(min) {
+  radarView.vectorMin = Math.max(VECTOR_RANGE[0], Math.min(VECTOR_RANGE[1], min));
   syncRadarMenu();
-});
+}
+$('vector-range').addEventListener('input', (ev) => setVector(Number(ev.target.value)));
+// − e +: un minuto alla volta, come il cursore
+$('vector-down').addEventListener('click', () => setVector(radarView.vectorMin - 1));
+$('vector-up').addEventListener('click', () => setVector(radarView.vectorMin + 1));
 $('zoom-range').addEventListener('input', (ev) => {
   zoomTo(canvas, sliderToZoom(Number(ev.target.value)));
   syncRadarMenu();
