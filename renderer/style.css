@@ -1,6 +1,8 @@
 * { box-sizing: border-box; }
 
 :root {
+  /* stessi caratteri su ogni sistema: Menlo su Mac, Consolas su Windows, DejaVu su Linux */
+  --mono: Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
   --bg: #050b12;
   --panel: #0a1420;
   --field: #0e1c28;
@@ -26,7 +28,7 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
   overflow: hidden;
 }
 
@@ -79,7 +81,7 @@ html, body {
 }
 
 #hud-sector {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 17px;
   font-weight: bold;
   color: var(--blue);
@@ -120,7 +122,7 @@ html, body {
 }
 
 .hud-cell strong {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 16px;
 }
 
@@ -182,7 +184,7 @@ html, body {
 
 .menu-info {
   min-width: 0;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
@@ -215,7 +217,7 @@ html, body {
 .slider output {
   min-width: 44px;
   text-align: right;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12px;
   color: var(--text);
 }
@@ -223,7 +225,7 @@ html, body {
 #statusbar .slider button { padding: 2px 8px; }
 
 .range-value {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12px;
   color: var(--text);
 }
@@ -369,7 +371,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 #label-callsign {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 22px;
   font-weight: bold;
   color: var(--green);
@@ -406,7 +408,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 
 .badge strong {
   color: var(--text);
-  font-family: monospace;
+  font-family: var(--mono);
 }
 
 #badge-mode { color: var(--blue); border-color: rgba(110, 200, 255, 0.45); }
@@ -436,14 +438,14 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
   animation: blink 1s steps(2, start) infinite;
 }
 
-.alert-time { font-family: monospace; font-weight: bold; }
+.alert-time { font-family: var(--mono); font-weight: bold; }
 
 @keyframes blink {
   to { background: #3a1010; }
 }
 
 #label-last {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12px;
   color: rgba(215, 230, 234, 0.8);
   background: var(--field);
@@ -517,7 +519,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 .value-row strong {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 16px;
   white-space: nowrap;
 }
@@ -540,7 +542,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 .dial-face { fill: #07111a; stroke: rgba(120, 170, 180, 0.45); stroke-width: 1; }
 .dial-tick { stroke: rgba(160, 200, 210, 0.3); stroke-width: 1; }
 .dial-tick.major { stroke: rgba(160, 200, 210, 0.75); stroke-width: 1.5; }
-.dial-label { fill: rgba(215, 230, 234, 0.6); font-size: 9px; font-family: monospace; text-anchor: middle; }
+.dial-label { fill: rgba(215, 230, 234, 0.6); font-size: 9px; font-family: var(--mono); text-anchor: middle; }
 .dial-current { stroke: var(--green); stroke-width: 3; stroke-linecap: round; }
 .dial-target { stroke: var(--yellow); stroke-width: 2; stroke-linecap: round; }
 .dial-target.pending { stroke-dasharray: 4 3; }
@@ -556,7 +558,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 
 #label-panel .stepper input {
   text-align: center;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 17px;
   font-weight: bold;
   padding: 4px;
@@ -598,7 +600,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
   list-style: none;
   padding: 0;
   margin: 0 0 8px;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 13px;
 }
 
@@ -687,7 +689,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 .transfer-info .muted { font-size: 12px; }
 
 .transfer-main {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 15px;
 }
 
@@ -743,7 +745,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 .toast {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 11.5px;
   line-height: 1.3;
   padding: 5px 8px;
@@ -768,7 +770,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 .radio-msg {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 11.5px;
   line-height: 1.3;
   text-align: left;
@@ -802,7 +804,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 .radio-msg.warn { border-color: var(--yellow); color: var(--yellow); }
 .radio-msg.warn .radio-text { color: rgba(255, 215, 94, 0.8); }
 .radio-more {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 11px;
   text-align: right;
   padding: 1px 4px;
@@ -863,7 +865,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 #centre-tabs button {
   padding: 9px 12px;
   font: inherit;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 15px;
   letter-spacing: 0.05em;
   text-align: left;
@@ -890,7 +892,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 
 .start-head h1 {
   margin: 0 0 4px;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 26px;
   color: var(--blue);
   letter-spacing: 0.06em;
@@ -971,7 +973,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 
 #layer-tabs button span {
   display: block;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12px;
   color: var(--muted);
 }
@@ -994,7 +996,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 #label-plan {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12px;
   margin: 6px 0 2px;
 }
@@ -1029,7 +1031,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 .sector-card-head strong {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 15px;
 }
 
@@ -1069,7 +1071,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 
 .setup-head strong {
   display: block;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 20px;
   color: var(--green);
   margin-bottom: 4px;
@@ -1105,7 +1107,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 
 .seg button span {
   display: block;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 11px;
   opacity: 0.75;
 }
@@ -1132,7 +1134,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 .setup-slider input[type='range']:disabled { opacity: 0.35; }
 
 .setup-slider output {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 13px;
   text-align: right;
   color: var(--blue);
@@ -1157,7 +1159,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 .sector-meta {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12px;
   color: var(--blue);
   margin-bottom: 4px;
@@ -1178,7 +1180,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 #go-title {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 22px;
   font-weight: bold;
   color: var(--red);
@@ -1215,7 +1217,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 .go-stats span { font-size: 12px; color: var(--muted); }
-.go-stats strong { font-family: monospace; font-size: 18px; }
+.go-stats strong { font-family: var(--mono); font-size: 18px; }
 
 .go-actions { display: flex; gap: 8px; }
 
@@ -1254,7 +1256,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
   background: #5d6772;
   border: 1px solid #b9c3cc;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
-  font-family: monospace;
+  font-family: var(--mono);
   color: #f2f5f7;
   text-align: center;
 }
@@ -1297,7 +1299,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
   background: none;
   border: 2px solid transparent;
   color: #f2f5f7;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 13px;
   padding: 2px 6px;
   cursor: pointer;
@@ -1455,15 +1457,15 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 .tool-vector input[type='range'] { width: 110px; accent-color: var(--blue); }
-.tool-vector output { font-family: monospace; min-width: 42px; }
+.tool-vector output { font-family: var(--mono); min-width: 42px; }
 
 .tool-zoom { gap: 4px; padding: 0 4px; }
 .tool-zoom input[type='range'] { width: 100px; accent-color: var(--blue); }
-.tool-zoom output { font-family: monospace; min-width: 38px; text-align: right; }
+.tool-zoom output { font-family: var(--mono); min-width: 38px; text-align: right; }
 #radar-tools .tool-zoom button { padding: 4px 8px; border: none; background: none; }
 
 #tag-btn.filtered:not(.active) { border-color: rgba(110, 200, 255, 0.6); color: var(--blue); }
-#tagfl-short { font-family: monospace; }
+#tagfl-short { font-family: var(--mono); }
 
 .tool-pop { position: relative; display: flex; }
 .tool-pop .caret { font-size: 10px; opacity: 0.7; }
@@ -1538,7 +1540,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
   grid-template-columns: 52px 1fr auto;
   gap: 6px;
   align-items: baseline;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 11.5px;
   padding: 3px 6px;
   border-radius: 3px;
@@ -1642,7 +1644,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 }
 
 #coach-lesson {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12.5px;
   letter-spacing: 0.04em;
   color: var(--blue);
@@ -1747,7 +1749,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
   margin: 10px 0 0;
   padding: 0;
   list-style: none;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12px;
 }
 
@@ -1796,7 +1798,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
   top: 50%;
   transform: translate(-50%, -50%);
   padding: 10px 18px;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 14px;
   letter-spacing: 0.08em;
   color: var(--blue);
@@ -1847,7 +1849,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 
 .cta-badge {
   grid-area: badge;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.08em;
   padding: 3px 5px;
@@ -1869,7 +1871,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 
 .cta-go {
   grid-area: go;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 12.5px;
   color: var(--blue);
   white-space: nowrap;
@@ -1928,7 +1930,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 .lesson-row:hover { background: #24425a; }
 
 .lesson-num {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 14px;
   text-align: center;
   color: var(--muted);
@@ -1948,14 +1950,14 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 .lesson-card { border-color: var(--green) !important; }
 
 #ld-badge {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.12em;
   color: var(--green);
 }
 
 #ld-title {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 22px;
   font-weight: bold;
   margin-top: 2px;
@@ -1987,7 +1989,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 }
 
 .brand-name {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 13px;
   letter-spacing: 0.22em;
   color: var(--green);
@@ -1999,7 +2001,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 }
 
 .brand-version {
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 11px;
   color: var(--muted);
 }
@@ -2088,7 +2090,7 @@ details.rules > ul {
 
 .about-head h2 {
   margin: 0;
-  font-family: monospace;
+  font-family: var(--mono);
   font-size: 20px;
   letter-spacing: 0.08em;
   color: var(--green);
@@ -2295,7 +2297,7 @@ button.link {
 
 /* comando a segmenti: quattro pulsanti della stessa larghezza su tutta la riga */
 .seg-ctl { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--ctl-gap); margin-bottom: 8px; }
-.seg-ctl button, #speed-buttons button { width: 100%; margin: 0 !important; font-family: ui-monospace, Menlo, monospace !important; }
+.seg-ctl button, #speed-buttons button { width: 100%; margin: 0 !important; font-family: var(--mono) !important; }
 #statusbar button.wide { width: 100%; }
 
 #areas-list { gap: 3px; }

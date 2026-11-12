@@ -9,6 +9,9 @@ import {
 } from './areas.js';
 import { cellOutline, cellRadius, cellAt, WEATHER_COLORS } from './weather.js';
 
+// Caratteri a spaziatura fissa del radar, gli stessi dell'interfaccia (--mono in style.css).
+export const MONO = 'Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace';
+
 export const TAG_W = 116;
 const TAG_LINE = 15;
 
@@ -167,7 +170,7 @@ function drawStaticMap(ctx, t, cw, ch) {
   ctx.setLineDash([]);
 
   // settori dello stesso livello
-  ctx.font = '11px monospace';
+  ctx.font = `11px ${MONO}`;
   for (const s of airspace.sectorsXY) {
     if (s.layer !== airspace.sector.layer || s.id === airspace.sector.id) continue;
     ctx.strokeStyle = 'rgba(150, 190, 200, 0.28)';
@@ -210,13 +213,13 @@ function drawStaticMap(ctx, t, cw, ch) {
     ctx.closePath();
     ctx.stroke();
     if (radarView.mapPoints === 'symbols') continue;
-    ctx.font = cop ? 'bold 11px monospace' : '10px monospace';
+    ctx.font = cop ? `bold 11px ${MONO}` : `10px ${MONO}`;
     ctx.fillStyle = cop ? 'rgba(120, 220, 235, 0.9)' : 'rgba(150, 190, 200, 0.36)';
     ctx.fillText(wp.id, px + size + 2, py - 4);
   }
 
   // aeroporti italiani visibili
-  ctx.font = 'bold 11px monospace';
+  ctx.font = `bold 11px ${MONO}`;
   for (const apt of airspace.airports) {
     if (!apt.app) continue;
     const { px, py } = t.toPx(apt.x, apt.y);
@@ -246,7 +249,7 @@ function drawStaticMap(ctx, t, cw, ch) {
   ctx.lineTo(x0 + len, y0 - 4);
   ctx.stroke();
   ctx.fillStyle = 'rgba(215, 230, 234, 0.6)';
-  ctx.font = '11px monospace';
+  ctx.font = `11px ${MONO}`;
   ctx.fillText(`${nm} NM`, x0 + len + 6, y0 + 3);
 }
 
@@ -267,7 +270,7 @@ function drawProcedures(ctx, t, cw, ch) {
   }
   ctx.setLineDash([]);
   const labelled = new Set();
-  ctx.font = '10px monospace';
+  ctx.font = `10px ${MONO}`;
   for (const p of shown) {
     ctx.fillStyle = PROC_COLORS[p.kind];
     for (const q of p.points) {
@@ -331,7 +334,7 @@ function drawTurbulence(ctx, t, sim) {
   ctx.strokeStyle = TURB_COLOR;
   ctx.fillStyle = TURB_COLOR;
   ctx.lineWidth = 1;
-  ctx.font = '11px monospace';
+  ctx.font = `11px ${MONO}`;
   for (const z of zones) {
     const { px, py } = t.toPx(z.x, z.y);
     const r = z.r * t.scale;
@@ -383,7 +386,7 @@ function drawWeather(ctx, t, sim) {
     const { px, py } = t.toPx(c.x, c.y);
     ctx.globalAlpha = 0.75;
     ctx.fillStyle = color;
-    ctx.font = '11px monospace';
+    ctx.font = `11px ${MONO}`;
     ctx.fillText(`CB ${String(cell.topFL).padStart(3, '0')}`, px - 20, py + 4);
   }
   ctx.restore();
@@ -447,11 +450,11 @@ function drawAreas(ctx, t, sim, selected, cw, ch) {
     ctx.lineJoin = 'round';
     ctx.lineWidth = 3;
     ctx.strokeStyle = HALO;
-    ctx.font = 'bold 11px monospace';
+    ctx.font = `bold 11px ${MONO}`;
     ctx.strokeText(l.text, p.px, y);
     ctx.fillStyle = color;
     ctx.fillText(l.text, p.px, y);
-    ctx.font = '10px monospace';
+    ctx.font = `10px ${MONO}`;
     ctx.strokeText(l.band, p.px, y + 12);
     ctx.fillText(l.band, p.px, y + 12);
   }
@@ -470,7 +473,7 @@ function drawAreas(ctx, t, sim, selected, cw, ch) {
     ctx.lineTo(p.px - 6, p.py + 6);
     ctx.stroke();
     const label = `${c.area.name} F${pad(c.altFt / 100)} ${fmtClock(clock + c.t).replace(':', '')} ${Math.round(c.t / 60)} MIN`;
-    ctx.font = 'bold 11px monospace';
+    ctx.font = `bold 11px ${MONO}`;
     const w = ctx.measureText(label).width + 10;
     ctx.fillStyle = 'rgba(8, 0, 0, 0.9)';
     ctx.fillRect(p.px + 9, p.py - 20, w, 16);
@@ -487,7 +490,7 @@ function drawAreas(ctx, t, sim, selected, cw, ch) {
 function drawClock(ctx, sim) {
   if (sim.clockS === undefined) return;
   ctx.save();
-  ctx.font = 'bold 15px monospace';
+  ctx.font = `bold 15px ${MONO}`;
   ctx.fillStyle = 'rgba(215, 230, 234, 0.8)';
   ctx.fillText(`${fmtClock(sim.clockS, true)} UTC`, 14, 24);
   ctx.restore();
@@ -501,7 +504,7 @@ function drawRouteLine(ctx, t, ac) {
     .filter((p) => p.wp);
   let prev = t.toPx(ac.x, ac.y);
   ctx.lineWidth = 1.6;
-  ctx.font = 'bold 11px monospace';
+  ctx.font = `bold 11px ${MONO}`;
   points.forEach(({ id, wp }, i) => {
     const p = t.toPx(wp.x, wp.y);
     const afterExit = i > exitIndex;
@@ -540,7 +543,7 @@ function drawFutureConflict(ctx, t, conflict) {
   const minutes = Math.floor(conflict.timeToConflict / 60);
   const seconds = Math.round(conflict.timeToConflict % 60).toString().padStart(2, '0');
   const label = `${minutes}:${seconds}`;
-  ctx.font = 'bold 11px monospace';
+  ctx.font = `bold 11px ${MONO}`;
   const w = ctx.measureText(label).width + 10;
   const spot = freeSpot(pa, pb, w, 16);
   ctx.fillStyle = 'rgba(10, 2, 2, 0.85)';
@@ -584,7 +587,7 @@ function drawStca(ctx, t, pair, now) {
 
   const secs = Math.max(0, Math.round(pair.timeToConflict));
   const label = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-  ctx.font = 'bold 12px monospace';
+  ctx.font = `bold 12px ${MONO}`;
   const w = ctx.measureText(label).width + 12;
   const spot = freeSpot(pa, pb, w, STCA_LABEL_H);
   ctx.fillStyle = 'rgba(8, 0, 0, 0.92)';
@@ -891,7 +894,7 @@ function drawMeasure(ctx, t, from, to, index) {
   const fmtBrg = (b) => String(Math.round(b) % 360 || 360).padStart(3, '0');
   const brg = bearing(from, to);
   const label = `${fmtBrg(brg)}/${fmtBrg(brg + 180)} ${nm < 10 ? nm.toFixed(1) : Math.round(nm)} NM`;
-  ctx.font = 'bold 12px monospace';
+  ctx.font = `bold 12px ${MONO}`;
   const w = ctx.measureText(label).width + 10;
   const x = (a.px + b.px) / 2 - w / 2;
   const y = (a.py + b.py) / 2 - 9;
@@ -967,7 +970,7 @@ function drawCpa(ctx, t, a, b, index) {
   // distanza minima, minuti al punto di massimo avvicinamento, separazione verticale in quel momento
   const nm = c.nm < 10 ? c.nm.toFixed(1) : Math.round(c.nm);
   const label = `${nm} NM ${Math.round(c.t / 60)} MIN ${Math.round(c.dFt / 100) * 100} FT`;
-  ctx.font = 'bold 12px monospace';
+  ctx.font = `bold 12px ${MONO}`;
   const w = ctx.measureText(label).width + 10;
   const x = (PA.px + PB.px) / 2 - w / 2;
   const y = (PA.py + PB.py) / 2 + 8;
@@ -1120,8 +1123,8 @@ function drawAircraft(ctx, t, ac, now) {
   ctx.globalAlpha = 1;
 }
 
-const LABEL_FONT = '13px monospace';
-const NAME_FONT = 'bold 13px monospace';
+const LABEL_FONT = `13px ${MONO}`;
+const NAME_FONT = `bold 13px ${MONO}`;
 const DOWNLINK = '#45c8ee';                   // dati letti da bordo (ciano)
 const XFL_NEAR_FT = 2000;                     // livello arancione a meno di 2000 ft dal livello di passaggio
 const MISMATCH = '#ff9f40';                   // livello selezionato a bordo diverso dall'autorizzato
@@ -1258,7 +1261,7 @@ function labelRows(ctx, ac, color, hovered) {
   let nameEnd = ctx.measureText(ac.callsign).width;
   // asterisco rosso: proseguendo con rotta e livello autorizzato il volo entrerà in una zona attiva
   if (fullLabel(ac) && ac.areaConflict) {
-    nameRow.push(field('*', nameEnd + 2, COLORS.conflict, null, 'bold 16px monospace'));
+    nameRow.push(field('*', nameEnd + 2, COLORS.conflict, null, `bold 16px ${MONO}`));
     nameEnd += 2 + ctx.measureText('*').width;
   }
   // prua: col mouse sopra quella letta da bordo (ciano); se il volo è vettorato quella assegnata (colore della
