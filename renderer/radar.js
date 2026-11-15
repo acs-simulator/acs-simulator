@@ -312,14 +312,15 @@ function blitStaticMap(ctx, canvas, t) {
 
 // --- elementi dinamici ---
 
-// Zone P, R, D, TSA e TRA: attive in grigio chiaro, in procinto di attivarsi (entro PREACTIVE_S) con il contorno
-// tratteggiato e l'ora d'inizio, non attive appena accennate (si possono nascondere dal menu Mappa, e hanno il
-// nome solo se interessano i livelli del settore). Diventano rosse, con un rosso tenue che lascia vedere il
-// traffico, appena la previsione lungo rotta e livello porta dentro un volo in contatto (il suo tag ha un
-// asterisco rosso); il contorno si fa più marcato quando il volo è troppo vicino (allarme di prossimità). Per il
-// volo selezionato compaiono la rotta e il punto d'ingresso previsto, con livello, ora e tempo mancante.
+// Zone P, R, D, TSA e TRA: attive in bianco a linea continua, in procinto di attivarsi (entro PREACTIVE_S) con il
+// contorno tratteggiato e l'ora d'inizio, non attive appena accennate (si possono nascondere dal menu Mappa, e
+// hanno il nome solo se interessano i livelli del settore). Un ingresso previsto lungo rotta e livello di un volo
+// in contatto lo segnala l'asterisco rosso nel suo tag; la zona diventa rossa con l'allarme di prossimità (volo
+// troppo vicino o dentro entro 2 minuti) e per il volo selezionato, di cui compaiono la rotta e il punto
+// d'ingresso previsto, con livello, ora e tempo mancante.
 const AREA_GREY = '205, 210, 218';
 const AREA_RED = '255, 77, 77';
+const AREA_WHITE = '255, 255, 255';
 
 // Temporali: eco delle celle convettive come su un display meteo, a due livelli (nucleo e bordo), con la
 // sommità scritta accanto. Sotto le tracce e le mappe, così non copre niente di importante.
@@ -396,9 +397,11 @@ function drawAreas(ctx, t, sim, selected, cw, ch) {
   if (!sim.areaSchedule) return;
   const clock = sim.clockS;
   const s = airspace.sector;
+  // rosse solo con l'allarme di prossimità (ingresso entro 2 minuti o troppo vicino) e, per il volo selezionato,
+  // la zona in cui entrerebbe; un ingresso previsto più in là lo segnala l'asterisco accanto al nominativo e la
+  // zona resta bianca come ogni zona attiva
   const red = new Set();
   for (const a of airspace.areas) if (a.alarm) red.add(a);
-  for (const ac of sim.aircraft) if (ac.areaConflict && (ac.control === 'assumed' || ac.control === 'offered')) red.add(ac.areaConflict.area);
   if (selected?.areaConflict) red.add(selected.areaConflict.area);
   const labels = [];
   ctx.save();
@@ -420,10 +423,11 @@ function drawAreas(ctx, t, sim, selected, cw, ch) {
       ctx.lineWidth = a.alarm ? 2 : 1.4;
       ctx.setLineDash([]);
     } else if (active) {
-      ctx.fillStyle = `rgba(${AREA_GREY}, ${ours ? 0.15 : 0.07})`;
+      // attiva: bianca, linea continua (più marcata se tocca i livelli del settore)
+      ctx.fillStyle = `rgba(${AREA_WHITE}, ${ours ? 0.12 : 0.06})`;
       ctx.fill();
-      ctx.strokeStyle = `rgba(${AREA_GREY}, ${ours ? 0.6 : 0.3})`;
-      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = `rgba(${AREA_WHITE}, ${ours ? 0.9 : 0.55})`;
+      ctx.lineWidth = ours ? 1.5 : 1.2;
       ctx.setLineDash([]);
     } else if (preactive) {
       ctx.strokeStyle = `rgba(${AREA_GREY}, 0.5)`;
@@ -438,7 +442,7 @@ function drawAreas(ctx, t, sim, selected, cw, ch) {
     ctx.setLineDash([]);
     if (active || preactive || alarm || ours) {
       const when = active ? '' : next ? ` ${fmtClock(next[0]).replace(':', '')}` : '';
-      labels.push({ a, alarm, dim: !alarm && ((active && !ours) || (!active && !preactive)), text: `${a.name}${when}`, band: areaBand(a) });
+      labels.push({ a, alarm, active, dim: !alarm && ((active && !ours) || (!active && !preactive)), text: `${a.name}${when}`, band: areaBand(a) });
     }
   }
   // etichette sopra i contorni: nome (con l'ora d'inizio se non è ancora attiva) e limiti verticali
@@ -446,7 +450,8 @@ function drawAreas(ctx, t, sim, selected, cw, ch) {
   for (const l of labels) {
     const p = t.toPx(l.a.labelAt.x, l.a.labelAt.y);
     const y = p.py + l.a.stack * 26 - 4;
-    const color = l.alarm ? `rgba(${AREA_RED}, 1)` : `rgba(${AREA_GREY}, ${l.dim ? 0.45 : 0.85})`;
+    const color = l.alarm ? `rgba(${AREA_RED}, 1)`
+      : l.active ? `rgba(${AREA_WHITE}, ${l.dim ? 0.6 : 0.95})` : `rgba(${AREA_GREY}, ${l.dim ? 0.45 : 0.85})`;
     ctx.lineJoin = 'round';
     ctx.lineWidth = 3;
     ctx.strokeStyle = HALO;

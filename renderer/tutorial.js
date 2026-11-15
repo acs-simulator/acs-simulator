@@ -637,9 +637,9 @@ export const LESSONS = [
       },
       {
         title: 'Un volo ci sta andando dentro',
-        text: `Quando rotta e livello autorizzato portano un tuo volo dentro una zona attiva, la zona diventa
-          <b>rosso tenue</b> e accanto al nominativo compare un <b>asterisco rosso</b>: cliccandolo vedi dove e
-          quando ci entrerebbe.`,
+        text: `Quando rotta e livello autorizzato portano un tuo volo dentro una zona attiva, accanto al
+          nominativo compare un <b>asterisco rosso</b>: cliccandolo vedi dove e quando ci entrerebbe, e la zona
+          diventa rossa.`,
         goal: 'Prendi in carico il volo e trova l\'asterisco rosso nel tag',
         hint: 'Clic sul tag magenta per l\'hand-on; l\'asterisco è subito dopo il nominativo.',
         arm: (c) => {
@@ -1038,7 +1038,8 @@ export class Tutorial {
           ev.preventDefault();
           this.next();
         }
-      } else if (ev.key === 't' || ev.key === 'T') {
+      } else if (ev.key === 'm' || ev.key === 'M') {
+        // M riduce il riquadro (T è la presa di un volo giallo)
         this.toggleCollapsed();
       }
     });

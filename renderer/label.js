@@ -131,6 +131,13 @@ export class LabelPanel {
 
   // Hand-off del volo selezionato: dal pulsante HAND-OFF o dalla barra spaziatrice sul radar. Restituisce true
   // se il volo è stato passato (anche al livello sbagliato, che conta come errore).
+  // tasto T: presa coordinata del volo giallo selezionato (o hand-on di quello offerto)
+  takeOverSelected() {
+    if (!this.aircraft || this.sim?.gameOver || !this.sim.takeOver(this.aircraft)) return false;
+    this._afterTransferAction();
+    return true;
+  }
+
   handOffSelected() {
     if (!this.aircraft || this.aircraft.control !== 'assumed' || this.sim?.gameOver) return false;
     if (this.sim.handOff(this.aircraft) === null) return false;
@@ -283,10 +290,10 @@ export class LabelPanel {
         : `⚠ Autorizzato ${fmtFl(ac.clearedFL)}, richiesto ${fmtFl(ac.requestedExitFL)}${revised}: l'hand-off conterebbe come errore`;
       check.className = levelOk ? 'hint ok' : 'hint warn';
     } else if (ac.control === 'transferred') {
-      check.textContent = `Non più in contatto: passato a ${ac.nextUnit}.`;
+      check.textContent = `Non più in contatto: passato a ${ac.nextUnit}. Premi T per riprenderlo.`;
       check.className = 'hint';
     } else {
-      check.textContent = 'Non in contatto: nessuna istruzione possibile.';
+      check.textContent = 'Non in contatto: nessuna istruzione possibile. Premi T per prenderlo.';
       check.className = 'hint';
     }
   }
