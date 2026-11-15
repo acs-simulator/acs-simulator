@@ -44,7 +44,10 @@ tutorial incluso. Serve un computer con mouse o trackpad e uno schermo di almeno
 | Linux | `ACS.Simulator-x.y.z.AppImage` o `.deb` | rendi l'AppImage eseguibile con `chmod +x` |
 
 Servono circa 300 MB di spazio e uno schermo di almeno 1100×700. Nessuna
-connessione a internet, nessun account, nessun dato raccolto.
+connessione a internet, nessun account, nessun dato raccolto. Il sito e la
+versione nel browser contano soltanto le visite, in forma anonima e senza cookie
+([GoatCounter](https://www.goatcounter.com)); il programma da scaricare non si
+collega a nessuno.
 
 ### Al primo avvio
 
