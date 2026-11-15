@@ -79,6 +79,7 @@ const CONFLICT_BUDGET_MS = 9;      // tempo di calcolo massimo per tentativo: ne
 const CONFLICT_RETRY_S = 5;
 const CONFLICT_LATE_S = 180;        // se non si trova altro, conflitti con più tempo per reagire di quello della difficoltà
 const CONFLICT_SPAWN_WAIT_S = 30;  // comparsa del volo in conflitto ritardata al più di così, se il posto è occupato
+const PLANNED_GRACE_S = 60;          // un conflitto programmato si considera in corso fino a un minuto dopo l'ora prevista
 const CONFLICT_CATCHUP_S = 600;    // conflitti in ritardo recuperati al più per questo tempo: niente raffiche
 const MOVED_FT = 900;              // un volo ha cambiato livello dall'offerta: il conflitto nasce da salita o discesa
 
@@ -717,17 +718,24 @@ function firstLoss(ta, tb, maxI, hNm = SEP_HORIZONTAL_NM) {
 }
 
 // Traiettoria di una copia campionata ogni stepS secondi: x, y e quota per ogni campione. transferredI: primo
-// campione in cui il volo è già passato all'ente successivo (Infinity se mai).
-function sampleTrajectory(ghost, durationS, stepS = CONFLICT_STEP_S) {
+// campione in cui il volo è già passato all'ente successivo (Infinity se mai). Con handoffLeadS conta anche
+// l'uscita laterale: il controllore passa il volo con quell'anticipo sul confine.
+function sampleTrajectory(ghost, durationS, stepS = CONFLICT_STEP_S, handoffLeadS = null) {
   const n = Math.floor(durationS / stepS) + 1;
   const out = new Float64Array(n * 3);
   out.transferredI = Infinity;
+  let wasInside = handoffLeadS !== null && insideLateral(ghost);
   for (let i = 0; i < n; i++) {
     if (i > 0) stepGhost(ghost, stepS);
     out[i * 3] = ghost.x;
     out[i * 3 + 1] = ghost.y;
     out[i * 3 + 2] = ghost.altitude;
     if (ghost.control === 'transferred' && out.transferredI === Infinity) out.transferredI = i;
+    if (handoffLeadS !== null && OURS.has(ghost.control) && out.transferredI === Infinity) {
+      const inside = insideLateral(ghost);
+      if (wasInside && !inside) out.transferredI = Math.max(0, i - Math.ceil(handoffLeadS / stepS));
+      wasInside ||= inside;
+    }
   }
   return out;
 }
@@ -750,13 +758,13 @@ function pathInside(track) {
 
 // Ritardo di comparsa (vicino alla stima geometrica) con cui il volo pianificato perde la separazione con la
 // traiettoria del bersaglio dentro il settore, dopo un tempo di reazione compreso in reactionS dall'ultima offerta.
-function scanConflict(plan, track, delayS, { xflI, xflDelayS, targetOffer, refFt, reactionS }) {
+function scanConflict(plan, track, delayS, { xflI, xflDelayS, targetOffer, refFt, reactionS, cells = [], handoffLeadS = null }) {
   const [lo, hi] = reactionS;
   const offerIn = plan.entryInS - OFFER_LEAD_S;
   const ghost = new Aircraft(plan);
   ghost.xflMode = xflI;
   ghost.xflIn = offerIn + xflDelayS;
-  const own = sampleTrajectory(ghost, offerIn + hi + 60);
+  const own = sampleTrajectory(ghost, offerIn + hi + 60, CONFLICT_STEP_S, handoffLeadS);
   const nT = track.length / 3;
   const nI = own.length / 3;
   const k0 = Math.max(0, Math.round((delayS - CONFLICT_SCAN_S) / CONFLICT_STEP_S));
@@ -778,7 +786,7 @@ function scanConflict(plan, track, delayS, { xflI, xflDelayS, targetOffer, refFt
       const j = (i + k) * 3;
       const reaction = (i + k) * CONFLICT_STEP_S - Math.max(k * CONFLICT_STEP_S + offerIn, targetOffer);
       const alt = track[j + 2];
-      // nessuno dei due è già stato passato: dopo l'hand-off (all'XFL o sulla STAR) il conflitto lo risolve
+      // nessuno dei due è già stato passato: dopo l'hand-off (all'XFL, sulla STAR o prima del confine) lo risolve
       // il settore successivo, non il giocatore
       if (reaction >= lo && reaction <= hi && i < own.transferredI && i + k < track.transferredI
         && alt >= airspace.floorFt - SEP_VERTICAL_FT && alt < airspace.ceilingFt + SEP_VERTICAL_FT
@@ -786,13 +794,33 @@ function scanConflict(plan, track, delayS, { xflI, xflDelayS, targetOffer, refFt
         const targetMoved = Math.abs(alt - refFt) >= MOVED_FT;
         const intruderMoved = Math.abs(own[i * 3 + 2] - plan.entryFt) >= MOVED_FT;
         const kind = targetMoved && intruderMoved ? 'both' : targetMoved ? 'target' : intruderMoved ? 'intruder' : 'level';
-        found = { delayS: k * CONFLICT_STEP_S, kind, reaction };
+        found = { delayS: k * CONFLICT_STEP_S, kind, reaction, i, k };
       }
     }
     if (found) run.push(found);
     else if (run.length) break;
   }
-  return run.length ? run[Math.floor(run.length / 2)] : null;
+  if (!run.length) return null;
+  const best = run[Math.floor(run.length / 2)];
+  // un temporale sulla strada di uno dei due prima dell'incontro: il pilota devierebbe e il conflitto non ci sarebbe
+  if (trackMeetsCell(own, best.i, best.delayS, cells) || trackMeetsCell(track, best.i + best.k, 0, cells)) return null;
+  return best;
+}
+
+// La traiettoria campionata, fino al campione last, entra nel cuore di una cella (dove sarà in quel momento)?
+// offsetS: fra quanti secondi parte la traiettoria. Basta un campione ogni WX_STEP_S.
+function trackMeetsCell(track, last, offsetS, cells) {
+  if (!cells.length) return false;
+  const every = Math.max(1, Math.round(WX_STEP_S / CONFLICT_STEP_S));
+  for (let i = 0; i <= last; i += every) {
+    const p = { x: track[i * 3], y: track[i * 3 + 1] };
+    for (const cell of cells) {
+      if (cellHit(cell, p, track[i * 3 + 2], offsetS + i * CONFLICT_STEP_S, AVOID_MARGIN_NM[cell.intensity] * WX_CORE_SCALE)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export function isConcerned(ac) {
@@ -1165,6 +1193,7 @@ export class Simulation {
     const wanted = weightedKey(conflictMix);
     const deadline = performance.now() + CONFLICT_BUDGET_MS;
     const busy = new Set(this.pendingConflicts.map((p) => p.plan.conflictTargetId));
+    const cells = (this.weather?.cells ?? []).filter((c) => cellRadius(c) > 0.5 || cellRadius(c, CONFLICT_HORIZON_S) > 0.5);
     const targets = shuffle(this.aircraft.filter((a) => a.requestedExitFL !== null && a.mode === 'route' && !busy.has(a.id)
       && (a.control === 'assumed' || a.control === 'offered' || a.control === 'inbound'))).slice(0, 4);
     let fallback = null;
@@ -1184,7 +1213,7 @@ export class Simulation {
       for (const xfl of modes) {
         if (performance.now() > deadline) return done();
         const tg = this._hypothesis(target, xfl);
-        const track = sampleTrajectory(tg, CONFLICT_HORIZON_S);
+        const track = sampleTrajectory(tg, CONFLICT_HORIZON_S, CONFLICT_STEP_S, this._handoffLeadS);
         const path = pathInside(track);
         if (path.length < 2) continue;
         for (const { plan, delayS } of conflictCandidates(path, MAX_CONFLICT_DELAY_S, deadline)) {
@@ -1193,7 +1222,7 @@ export class Simulation {
           for (const xflI of intruderModes) {
             if (performance.now() > deadline) return done();
             const option = scanConflict(plan, track, delayS, {
-              xflI, xflDelayS: this._xflDelayS, targetOffer, refFt, reactionS: window,
+              xflI, xflDelayS: this._xflDelayS, targetOffer, refFt, reactionS: window, cells, handoffLeadS: this._handoffLeadS,
             });
             if (!option) continue;
             const spawnAt = this.simTime + option.delayS;
@@ -1255,6 +1284,7 @@ export class Simulation {
         if (reaction < lo - 60 || reaction > hi + CONFLICT_LATE_S + 120) continue;
         plan.conflictXfl = xfl;
         plan.conflictXflIntruder = xflI;
+        plan.conflictInS = delayS + t;
         return reaction;
       }
     }
@@ -1277,6 +1307,7 @@ export class Simulation {
           if (this._areaAllowed(ac, plan, true)) {
             ac.plannedConflict = {
               targetId: target.id, kind: plan.conflictKind, xfl: !!plan.conflictXfl, xflIntruder: !!plan.conflictXflIntruder,
+              atS: this.simTime + (plan.conflictInS ?? 0),
             };
             this._commit(ac, plan);
             this.conflictStats.delivered++;
@@ -1755,7 +1786,15 @@ export class Simulation {
     return ac.control === 'assumed' && !ac.emergency && !ac.request && ac.exitKind !== 'star'
       && ac.verticalPhase === 'cruise' && insideLateral(ac)
       && ac.assumedAt !== null && this.simTime - ac.assumedAt >= LEVEL_MIN_ASSUMED_S
-      && this._timeToExit(ac) > LEVEL_MIN_LEFT_S;
+      && this._timeToExit(ac) > LEVEL_MIN_LEFT_S && !this._inPlannedConflict(ac);
+  }
+
+  // Volo di un conflitto programmato che deve ancora presentarsi (il volo in conflitto o il suo bersaglio): non
+  // chiede un altro livello, che scioglierebbe il conflitto prima che il giocatore lo veda.
+  _inPlannedConflict(ac) {
+    const pending = (a) => a.plannedConflict && this.simTime < a.plannedConflict.atS + PLANNED_GRACE_S && OURS.has(a.control);
+    if (pending(ac)) return true;
+    return this.aircraft.some((a) => a.plannedConflict?.targetId === ac.id && pending(a));
   }
 
   _openLevelRequest(ac, choice, zone = null) {
