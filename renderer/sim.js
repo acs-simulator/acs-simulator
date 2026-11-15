@@ -1,4 +1,4 @@
-import { waypoint, insideVolume, insideLateral, inView, airspace, distanceFromSector } from './airspace.js';
+import { waypoint, insideVolume, insideLateral, inView, airspace, distanceFromSector, unitAt } from './airspace.js';
 import { generateCallsign } from './callsigns.js';
 import { DIFFICULTY, sectorDemand } from './sectors.js';
 import { normalizeDeg, angleDiff, bearing, distance, distanceToSegment } from './geo.js';
@@ -395,7 +395,9 @@ export class Aircraft {
   // Livello giusto per l'hand-off: quello d'uscita richiesto oppure, dopo una revisione chiesta dal pilota,
   // anche quello pianificato all'inizio.
   get exitLevelOk() {
-    return this.requestedExitFL !== null
+    // preso con T senza un livello d'uscita pianificato: si ripassa a qualunque livello
+    if (this.freeExit) return true;
+    return this.requestedExitFL != null
       && (this.clearedFL === this.requestedExitFL || (this.altExitFL !== null && this.clearedFL === this.altExitFL));
   }
 
@@ -1355,6 +1357,41 @@ export class Simulation {
     this.stats.assumed++;
     ac.lastInstruction = 'Hand-on: in contatto';
     this._emit('event', { type: 'handon', ac });
+    return true;
+  }
+
+  // Presa di un volo giallo (tasto T), coordinata a voce con chi lo ha: un volo che abbiamo appena passato,
+  // uno ancora con l'ente precedente o uno di un altro settore. Diventa nostro a tutti gli effetti, separazione
+  // compresa, e va ripassato. Un volo preso fuori dal settore non conta come uscito senza hand-off: lo diventa
+  // solo se entra e poi esce. Il traffico che non era pianificato attraverso il settore non ha un livello
+  // d'uscita richiesto: lo si ripassa all'ente in cui si trova, a qualunque livello.
+  takeOver(ac) {
+    if (this.gameOver) return false;
+    if (ac.control === 'offered') return this.handOn(ac);
+    if (ac.control !== 'transferred' && ac.control !== 'inbound' && ac.control !== 'other') return false;
+    const from = ac.control;
+    if (from === 'inbound') {
+      ac.assignedAltitude = coordinatedAltitude(ac.assignedAltitude, ac.clamp, ac.entryFt);
+      ac.offeredAt ??= this.simTime;
+    }
+    if (from === 'other' || ac.requestedExitFL == null) {
+      ac.freeExit = true;
+      ac.nextUnit = unitAt(ac, ac.altitude);
+      ac.exitKind ??= 'lateral';
+      ac.requestedExitFL = null;
+      ac.altExitFL ??= null;
+    }
+    if (!insideVolume(ac)) ac.wasInside = false;
+    if (!insideLateral(ac)) ac.wasLateral = false;
+    ac.outsideSince = null;
+    ac.handedInStca = false;
+    ac.control = 'assumed';
+    ac.wasAssumed = true;
+    ac.assumedAt = this.simTime;
+    ac.offeredAt ??= this.simTime;
+    this.stats.assumed++;
+    ac.lastInstruction = 'Presa coordinata: in contatto';
+    this._emit('event', { type: 'takeover', ac, from });
     return true;
   }
 

@@ -489,6 +489,7 @@ function startGame(sectorId, settings = sessionSettings(), lesson = null) {
     // resta fra i messaggi dei piloti, senza una notifica in più
     if (type === 'handoff' && !correct && !event.emergency) toast(`✗ ${ac.callsign} transferred at ${fmtFl(ac.clearedFL)}, not ${fmtFl(ac.requestedExitFL)} (${sim.strikes.length}/${MAX_STRIKES})`, 'error');
     if (type === 'missed' && !event.emergency) toast(`✗ ${ac.callsign} left the sector without hand-off (${sim.strikes.length}/${MAX_STRIKES})`, 'error');
+    if (type === 'takeover') toast(`${ac.callsign} taken from ${event.from === 'inbound' ? ac.prevUnit : ac.nextUnit}, now under your control`, 'ok');
     if (type === 'stca') toast(`⚠ STCA ${event.a.callsign} – ${event.b.callsign}: separation lost in ${Math.max(0, Math.round(event.t))} s`, 'error');
     // perdita fra voli non nostri: si vede in rosso sul radar, ma non è un errore del giocatore
     if (type === 'loss-other') toast(`${event.a.callsign} – ${event.b.callsign}: separation lost outside your responsibility`, 'warn');
@@ -1090,6 +1091,14 @@ window.addEventListener('keydown', (ev) => {
   if (ev.key === ' ' && !typing && sim && !sim.gameOver) {
     ev.preventDefault();
     if (!labelPanel.handOffSelected()) toast('Select a flight under your control first', 'warn');
+    return;
+  }
+  // T: presa del volo giallo selezionato (passato, ancora con l'ente precedente o di un altro settore)
+  if ((ev.key === 't' || ev.key === 'T') && !typing && sim && !sim.gameOver && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
+    const ac = labelPanel.aircraft;
+    if (!ac) toast('Select a yellow flight first, then press T', 'warn');
+    else if (ac.control === 'assumed') toast(`${ac.callsign} is already under your control`, 'warn');
+    else if (!labelPanel.takeOverSelected()) toast(`${ac.callsign} cannot be taken`, 'warn');
     return;
   }
   if ((ev.key === 'r' || ev.key === 'R') && !typing && sim) {
