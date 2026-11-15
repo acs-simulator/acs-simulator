@@ -716,15 +716,18 @@ function firstLoss(ta, tb, maxI, hNm = SEP_HORIZONTAL_NM) {
   return -1;
 }
 
-// Traiettoria di una copia campionata ogni stepS secondi: x, y e quota per ogni campione.
+// Traiettoria di una copia campionata ogni stepS secondi: x, y e quota per ogni campione. transferredI: primo
+// campione in cui il volo è già passato all'ente successivo (Infinity se mai).
 function sampleTrajectory(ghost, durationS, stepS = CONFLICT_STEP_S) {
   const n = Math.floor(durationS / stepS) + 1;
   const out = new Float64Array(n * 3);
+  out.transferredI = Infinity;
   for (let i = 0; i < n; i++) {
     if (i > 0) stepGhost(ghost, stepS);
     out[i * 3] = ghost.x;
     out[i * 3 + 1] = ghost.y;
     out[i * 3 + 2] = ghost.altitude;
+    if (ghost.control === 'transferred' && out.transferredI === Infinity) out.transferredI = i;
   }
   return out;
 }
@@ -775,7 +778,9 @@ function scanConflict(plan, track, delayS, { xflI, xflDelayS, targetOffer, refFt
       const j = (i + k) * 3;
       const reaction = (i + k) * CONFLICT_STEP_S - Math.max(k * CONFLICT_STEP_S + offerIn, targetOffer);
       const alt = track[j + 2];
-      if (reaction >= lo && reaction <= hi
+      // nessuno dei due è già stato passato: dopo l'hand-off (all'XFL o sulla STAR) il conflitto lo risolve
+      // il settore successivo, non il giocatore
+      if (reaction >= lo && reaction <= hi && i < own.transferredI && i + k < track.transferredI
         && alt >= airspace.floorFt - SEP_VERTICAL_FT && alt < airspace.ceilingFt + SEP_VERTICAL_FT
         && insideLateral({ x: track[j], y: track[j + 1] })) {
         const targetMoved = Math.abs(alt - refFt) >= MOVED_FT;
@@ -2404,8 +2409,13 @@ export class Simulation {
   // volo prima che la soluzione cada, il volo ci arriva al livello a cui l'ha fermato (un livello d'ingresso
   // rivisto, come al telefono). I voli in contatto con noi non si toccano mai. Una soluzione resta finché senza
   // di essa il volo tornerebbe in conflitto.
+  //
+  // Un conflitto programmato (costruito per il giocatore) non lo risolve nessuno: finché il volo in conflitto e il
+  // suo bersaglio sono ancora con l'ente precedente, quell'ente non dà loro nuove istruzioni. Se uno dei due è in
+  // conflitto con un terzo volo, l'ente che lo risolve muove il terzo.
   _moverKind(ac) {
     if (ac.emergency) return null;
+    if (ac.control === 'inbound' && (ac.plannedConflict || this._plannedTargets?.has(ac.id))) return 'keep';
     // un volo appena passato: l'ente successivo può già decidere come separarlo, lo istruirà dopo TAKEOVER_S
     if (ac.control === 'other' || ac.control === 'inbound' || ac.control === 'transferred') return 'full';
     if (ac.control === 'offered') return 'keep';   // nessuna nuova soluzione, ma quella in corso resta
@@ -2449,6 +2459,11 @@ export class Simulation {
     const checkI = RESOLVE_CHECK_S / RESOLVE_STEP_S;
     const tracks = new Map(this.aircraft.map((ac) => [ac, this._resolveTrack(ac)]));
     const byId = new Map(this.aircraft.map((ac) => [ac.id, ac]));
+    // bersagli dei conflitti programmati, in arrivo o già consegnati
+    this._plannedTargets = new Set([
+      ...this.pendingConflicts.map((p) => p.plan.conflictTargetId),
+      ...this.aircraft.filter((a) => a.plannedConflict).map((a) => a.plannedConflict.targetId),
+    ]);
 
     // soluzioni non più necessarie: senza, il volo non sarebbe in conflitto con nessuno
     for (const ac of this.aircraft) {
