@@ -79,6 +79,12 @@ check('_site/play contiene il simulatore', fs.existsSync(path.join(ROOT, '_site/
   && fs.existsSync(path.join(ROOT, '_site/play/sim.js')));
 const landing = fs.existsSync(path.join(ROOT, 'site/index.html')) ? fs.readFileSync(path.join(ROOT, 'site/index.html'), 'utf8') : '';
 check('la pagina rimanda al simulatore e ai download', landing.includes('href="play/"') && landing.includes('/releases/latest'));
+const siteHtml = fs.readFileSync(path.join(ROOT, '_site/index.html'), 'utf8');
+const playHtml = fs.readFileSync(path.join(ROOT, '_site/play/index.html'), 'utf8');
+check('il sito e il gioco nel browser contano le visite', siteHtml.includes('goatcounter') && playHtml.includes('goatcounter'));
+check('il programma da scaricare non contiene contatori',
+  !fs.readFileSync(path.join(ROOT, 'renderer/index.html'), 'utf8').includes('goatcounter')
+  && !fs.readFileSync(path.join(ROOT, 'site/index.html'), 'utf8').includes('goatcounter.com/count'));
 
 // --- 2. sostegno al progetto -------------------------------------------------
 
