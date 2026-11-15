@@ -1,7 +1,9 @@
 // Banco di prova senza interfaccia: fa girare la simulazione con un "controllore automatico"
 // (hand-on appena il volo è offerto, livello d'uscita autorizzato subito, hand-off al momento giusto)
 // e misura, per ogni settore, il carico medio, le offerte orarie, i minuti di competenza per volo,
-// gli allarmi STCA, le perdite di separazione fra voli di altri enti (che quegli enti dovrebbero evitare),
+// gli allarmi STCA, i conflitti programmati consegnati (plannedPerH) e quelli che senza interventi si presentano
+// davvero (plannedRealPerH), gli arrivi offerti ancora in salita (climbingArrivals: deve restare 0),
+// le perdite di separazione fra voli di altri enti (che quegli enti dovrebbero evitare),
 // gli hand-off sbagliati o mancati e i voli che (senza vettoramenti) entrerebbero in una zona
 // attiva: allarmi di prossimità (apwPerH) e violazioni (areaPerH, di cui areaStrikes contate come errori).
 //
@@ -42,13 +44,14 @@ function conflictAhead(sim, ac) {
 }
 
 export function measure(centreId, sectorId, hours = 5, seed = 1) {
-  setCentre(centreId);
-  loadSector(sectorId);
+  // il seme va fissato prima di caricare il settore: anche le piste in uso (vento) si scelgono a caso
   let rnd = (seed * 2654435761) % 4294967296;
   Math.random = () => {
     rnd = (rnd * 1664525 + 1013904223) % 4294967296;
     return rnd / 4294967296;
   };
+  setCentre(centreId);
+  loadSector(sectorId);
   // DIFF=facile|media|difficile per misurare un'altra difficoltà (di default quella del settore)
   const sim = new Simulation(process.env.DIFF ? { difficulty: process.env.DIFF } : {});
   sim._endGame = () => {};   // le perdite di separazione non fermano la misura
@@ -63,6 +66,9 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
   let areaStrikes = 0;
   let emergencies = 0;
   let ownDescents = 0;
+  let climbingArrivals = 0;   // arrivi (devono scendere nel settore) offerti mentre stanno ancora salendo
+  const planned = new Map();  // voli consegnati in conflitto programmato -> bersaglio
+  let plannedReal = 0;        // ...il cui conflitto, senza interventi, si è presentato davvero (allarme STCA)
   let othersLost = 0;
   const emergencyKinds = {};
   sim.on('event', (e) => {
@@ -80,6 +86,11 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     // automatico (non separa i voli prima dell'hand-off), non degli altri enti
     if (e.type === 'loss-other' && !e.a.handedInConflict && !e.b.handedInConflict) othersLost++;
     if (e.type === 'offered') {
+      const { ac } = e;
+      const descends = ac.exitKind === 'bottom' || ac.exitKind === 'star' || ac.requestedExitFL * 100 < ac.entryFt;
+      // (chi ha deviato per un temporale può dover ancora livellare al primo livello sopra: meno di 1000 ft)
+      if (descends && ac.assignedAltitude > ac.altitude + 1000) climbingArrivals++;
+      if (ac.plannedConflict) planned.set(ac.id, ac.plannedConflict.targetId);
       offers++;
       offerTime.set(e.ac, sim.simTime);
     }
@@ -118,6 +129,7 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
       if (!seen.has(key)) {
         seen.add(key);
         conflicts++;
+        if (planned.get(p.a.id) === p.b.id || planned.get(p.b.id) === p.a.id) plannedReal++;
       }
     }
     loadSum += sim.aircraft.filter((a) => a.control === 'offered' || a.control === 'assumed').length;
@@ -134,6 +146,9 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     transitMin: +(mean(transits) / 60).toFixed(2),
     handoffs: transits.length,
     stcaPerH: +(conflicts / hours).toFixed(1),
+    plannedPerH: +(planned.size / hours).toFixed(1),
+    plannedRealPerH: +(plannedReal / hours).toFixed(1),
+    climbingArrivals,
     othersLostPerH: +(othersLost / hours).toFixed(2),
     resolutionsPerH: +(sim.resolutions / hours).toFixed(1),
     wrong: wrong.length,

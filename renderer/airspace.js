@@ -15,6 +15,8 @@ import {
 const VIEW_MARGIN_NM = 45;
 const COP_BAND_NM = 6;      // un punto FRA è candidato COP se dista meno di così dal confine
 const COP_SPACING_NM = 20;
+const DEPARTURE_LEG_NM = 3;  // salita iniziale sull'asse pista, oltre la fine pista, prima di virare verso la SID
+const FINAL_LEG_NM = 9;      // finale: l'arrivo si allinea all'asse pista a questa distanza dalla soglia
 
 export const airspace = {
   sector: null,
@@ -94,6 +96,7 @@ export function loadSector(sectorId) {
   byId = new Map([...airspace.procFixes.values(), ...airspace.waypoints, ...airspace.airports].map((w) => [w.id, w]));
   // piste in uso nella sessione (vento): decidono SID e STAR dei voli
   chooseRunways();
+  runwayFixes(proj);
   airspace.procMap = procedureMap(proj);
 
   airspace.coast = COASTLINE.map((line) => line.map(toXY));
@@ -115,6 +118,36 @@ export function loadSector(sectorId) {
     flow.oursWeight = flow.crossesSector && volumeEligibility(airspace, flow) > 0 ? flow.weight : 0;
   }
   return airspace;
+}
+
+// Punti sull'asse delle piste in uso: la partenza sale diritta fino a DEPARTURE_LEG_NM oltre la fine pista e solo
+// allora vira verso il primo punto della SID; l'arrivo lascia l'ultimo punto della STAR per allinearsi al
+// finale a FINAL_LEG_NM dalla soglia. Senza, i voli andrebbero in linea retta fra l'aeroporto e la procedura,
+// qualunque sia la pista. Ogni aeroporto riceve depFix e finalFix (punti con nome ICAO/pista).
+function runwayFixes(proj) {
+  for (const a of airspace.airports) {
+    const p = PROCEDURES[a.icao];
+    const rw = activeRunways[a.icao];
+    a.depFix = null;
+    a.finalFix = null;
+    if (!p || !rw) continue;
+    const axis = (name, fromThr, nm) => {
+      const r = p.runways[name];
+      if (!r) return null;
+      const thr = proj.toXY(...r.thr);
+      const end = proj.toXY(...r.end);
+      const len = Math.hypot(end.x - thr.x, end.y - thr.y);
+      if (len < 0.2) return null;
+      const ux = (end.x - thr.x) / len;
+      const uy = (end.y - thr.y) / len;
+      const base = fromThr ? thr : end;
+      const point = { id: `${a.icao}/${name}`, types: '', proc: true, runway: true, x: base.x + ux * nm, y: base.y + uy * nm };
+      byId.set(point.id, point);
+      return point;
+    };
+    a.depFix = axis(rw.dep[0], false, DEPARTURE_LEG_NM);
+    a.finalFix = axis(rw.arr[0], true, -FINAL_LEG_NM);
+  }
 }
 
 // SID e STAR delle piste in uso degli aeroporti visibili: spezzate già proiettate, con i nomi dei fix.
@@ -145,7 +178,7 @@ export function waypoint(id) {
 
 export function isFraPoint(id) {
   const w = byId.get(id);
-  return !!w && !w.icao;
+  return !!w && !w.icao && !w.runway; // non gli aeroporti né i punti sull'asse pista
 }
 
 export function insideLateral(p) {
