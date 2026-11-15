@@ -2288,7 +2288,7 @@ button.link {
   background: var(--well);
   border: 1px solid var(--line-soft);
 }
-.hud-cell span { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; }
+.hud-cell span { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
 .hud-cell strong { font-size: 19px; line-height: 1; }
 .hud-cell.offered.active { border-color: var(--magenta); background: rgba(255, 91, 216, 0.08); }
 
