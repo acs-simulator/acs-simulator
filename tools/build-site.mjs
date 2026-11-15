@@ -22,7 +22,7 @@ fs.cpSync(path.join(ROOT, 'renderer'), path.join(OUT, 'play'), { recursive: true
 // Conteggio delle visite (GoatCounter: anonimo, senza cookie né banner). Si aggiunge solo qui, alle copie
 // pubblicate: i file di site/ e renderer/ restano senza, e il programma da scaricare non si collega a nessuno.
 // Il codice è il nome scelto alla registrazione su goatcounter.com; localhost non viene contato.
-const GOATCOUNTER = 'acs-simulator';
+const GOATCOUNTER = 'acs-sim';
 const COUNTER = `<script data-goatcounter="https://${GOATCOUNTER}.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>\n`;
 for (const file of [path.join(OUT, 'index.html'), path.join(OUT, 'play', 'index.html')]) {
   const html = fs.readFileSync(file, 'utf8');
