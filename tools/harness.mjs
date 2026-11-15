@@ -3,6 +3,7 @@
 // e misura, per ogni settore, il carico medio, le offerte orarie, i minuti di competenza per volo,
 // gli allarmi STCA, i conflitti programmati consegnati (plannedPerH) e quelli che senza interventi si presentano
 // davvero (plannedRealPerH), gli arrivi offerti ancora in salita (climbingArrivals: deve restare 0),
+// le perdite di separazione fra voli di altri enti (che quegli enti dovrebbero evitare),
 // gli hand-off sbagliati o mancati e i voli che (senza vettoramenti) entrerebbero in una zona
 // attiva: allarmi di prossimità (apwPerH) e violazioni (areaPerH, di cui areaStrikes contate come errori).
 //
@@ -26,6 +27,20 @@ const DT = 2;   // passo di simulazione (s)
 function nearExit(ac) {
   const fix = ac.exitFix ? waypoint(ac.exitFix) : null;
   return fix ? distance(ac, fix) < 6 : false;
+}
+
+// Il volo, proseguendo come autorizzato, perde la separazione con qualcuno nei prossimi sei minuti?
+// (traiettorie previste come le prevedono gli altri enti per risolvere i loro conflitti)
+function conflictAhead(sim, ac) {
+  const mine = sim._resolveTrack(ac);
+  return sim.aircraft.some((other) => {
+    if (other === ac) return false;
+    const t = sim._resolveTrack(other);
+    for (let k = 0; k < Math.min(mine.length, t.length); k += 3) {
+      if (Math.abs(mine[k + 2] - t[k + 2]) < 1000 && Math.hypot(mine[k] - t[k], mine[k + 1] - t[k + 1]) < 5) return true;
+    }
+    return false;
+  });
 }
 
 export function measure(centreId, sectorId, hours = 5, seed = 1) {
@@ -54,6 +69,7 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
   let climbingArrivals = 0;   // arrivi (devono scendere nel settore) offerti mentre stanno ancora salendo
   const planned = new Map();  // voli consegnati in conflitto programmato -> bersaglio
   let plannedReal = 0;        // ...il cui conflitto, senza interventi, si è presentato davvero (allarme STCA)
+  let othersLost = 0;
   const emergencyKinds = {};
   sim.on('event', (e) => {
     if (e.type === 'apw') apw.add(`${e.ac.callsign}|${e.area.id}`);
@@ -66,6 +82,9 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
       emergencyKinds[e.emergency.id] = (emergencyKinds[e.emergency.id] ?? 0) + 1;
     }
     if (e.type === 'emergency-descent') ownDescents++;
+    // perdite fra voli non nostri; quelle fra voli passati già in conflitto sono colpa del controllore
+    // automatico (non separa i voli prima dell'hand-off), non degli altri enti
+    if (e.type === 'loss-other' && !e.a.handedInConflict && !e.b.handedInConflict) othersLost++;
     if (e.type === 'offered') {
       const { ac } = e;
       const descends = ac.exitKind === 'bottom' || ac.exitKind === 'star' || ac.requestedExitFL * 100 < ac.entryFt;
@@ -96,7 +115,10 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
       const ready = ac.wasInside && (ac.verticalExit
         ? Math.abs(ac.altitude - ac.requestedExitFL * 100) < 1200
         : (ac.wasLateral && !insideLateral(ac)) || nearExit(ac));
-      if (ready) sim.handOff(ac);
+      if (ready) {
+        ac.handedInConflict = conflictAhead(sim, ac);
+        sim.handOff(ac);
+      }
     }
     const t0 = performance.now();
     sim.tick(DT);
@@ -127,6 +149,8 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     plannedPerH: +(planned.size / hours).toFixed(1),
     plannedRealPerH: +(plannedReal / hours).toFixed(1),
     climbingArrivals,
+    othersLostPerH: +(othersLost / hours).toFixed(2),
+    resolutionsPerH: +(sim.resolutions / hours).toFixed(1),
     wrong: wrong.length,
     emergencies,
     emergencyKinds,

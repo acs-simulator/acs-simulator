@@ -4,8 +4,8 @@
 //   2. il link del sostegno è configurato (altrimenti il pulsante non comparirebbe)
 //   3. le lezioni della modalità guidata sono ben formate
 //   4. la simulazione è ancora in bilancio: carico nella fascia della difficoltà, nessun hand-off
-//      sbagliato dal "controllore automatico", tempo di calcolo per passo sotto soglia, nessun arrivo
-//      offerto in salita, conflitti programmati consegnati e reali
+//      sbagliato dal "controllore automatico", perdite di separazione fra voli altrui rare, tempo di calcolo
+//      per passo sotto soglia, nessun arrivo offerto in salita, conflitti programmati consegnati e reali
 //
 // Il punto 4 fa girare il banco di prova (tools/harness.mjs) con un seme fisso, quindi è ripetibile:
 // se un cambiamento sposta il bilanciamento del traffico, qui si vede.
@@ -145,13 +145,45 @@ const { measure } = await import(`${ROOT}/tools/harness.mjs`);
 const { DIFFICULTY } = await import(`${R}/sector-model.js`);
 const { CENTRES } = await import(`${R}/sectors.js`);
 
+// Il tempo di calcolo dipende dal computer: i server di GitHub sono due o tre volte più lenti di un Mac recente.
+// Un calcolo di prova sempre uguale misura la velocità della macchina e la soglia si allarga di conseguenza
+// (mai sotto i 5 ms): un peggioramento della simulazione si vede ovunque, un computer lento non fa fallire.
+const TICK_LIMIT_MS = 5;
+const BENCH_REF_MS = 20;   // il calcolo di prova su un Mac Apple Silicon recente
+function benchMs() {
+  let best = Infinity;
+  for (let r = 0; r < 5; r++) {
+    const t0 = performance.now();
+    const a = new Float64Array(3000);
+    let acc = 0;
+    for (let k = 0; k < 200; k++) {
+      for (let i = 0; i < a.length; i++) {
+        const x = Math.sin(i * 0.01 + k) * 50;
+        const y = Math.cos(i * 0.02 - k) * 50;
+        a[i] = Math.hypot(x, y) + Math.atan2(y, x);
+        acc += a[i];
+      }
+      const objs = [];
+      for (let i = 0; i < 200; i++) objs.push({ id: i, v: a[(i * 7 + k) % a.length] });
+      objs.sort((p, q) => p.v - q.v);
+      acc += objs[0].v;
+    }
+    best = Math.min(best, performance.now() - t0);
+    if (!Number.isFinite(acc)) throw new Error('calcolo di prova non valido');
+  }
+  return best;
+}
+const speed = Math.max(1, benchMs() / BENCH_REF_MS);
+const tickLimit = TICK_LIMIT_MS * speed;
+console.log(`  velocità della macchina: ${speed.toFixed(2)}× più lenta del riferimento, soglia di calcolo ${tickLimit.toFixed(1)} ms`);
+
 const CASES = [['roma', 'NWA'], ['roma', 'OVB'], ['milano', CENTRES[1].sectors[0].id]];
 for (const [centre, id] of CASES) {
   const sector = CENTRES.find((c) => c.id === centre).sectors.find((s) => s.id === id);
   const target = DIFFICULTY[sector.difficulty].load;
   const r = measure(centre, id, 2, 7);
   const line = `carico ${r.load} (atteso ~${target}) · offerte/h ${r.offersPerH} · passaggio ${r.transitMin} min`
-    + ` · hand-off ${r.handoffs} · tick ${r.tickMsAvg} ms`;
+    + ` · hand-off ${r.handoffs} · perdite altrui/h ${r.othersLostPerH} · tick ${r.tickMsAvg} ms`;
   console.log(`  ${centre} ${id}: ${line}`);
   check(`${id}: carico vicino alla difficoltà`, r.load > target * 0.6 && r.load < target * 1.5,
     `carico ${r.load}, atteso fra ${(target * 0.6).toFixed(1)} e ${(target * 1.5).toFixed(1)}`);
@@ -160,7 +192,12 @@ for (const [centre, id] of CASES) {
   const wrongRate = r.handoffs ? r.wrong / r.handoffs : 0;
   check(`${id}: hand-off corretti`, wrongRate < 0.1,
     `${r.wrong} sbagliati su ${r.handoffs} (${Math.round(wrongRate * 100)}%, soglia 10%)`);
-  check(`${id}: calcolo fluido`, r.tickMsAvg < 5, `${r.tickMsAvg} ms per passo`);
+  // gli altri settori risolvono i conflitti fra i loro voli: una perdita di separazione altrui è un'eccezione.
+  // Su sei semi da tre ore la media è sotto 1 all'ora in NWA, OVB ed ESA, ma in due ore sono pochi eventi e
+  // il conto oscilla (anche 2 all'ora in una prova sola): la soglia guarda le derive vere, non il caso
+  check(`${id}: gli altri enti separano il loro traffico`, r.othersLostPerH <= 2.5,
+    `${r.othersLostPerH} perdite di separazione all'ora fra voli non nostri (soglia 2,5)`);
+  check(`${id}: calcolo fluido`, r.tickMsAvg < tickLimit, `${r.tickMsAvg} ms per passo (soglia ${tickLimit.toFixed(1)} ms)`);
   // un volo che nel settore deve scendere non viene mai passato mentre sta ancora salendo
   check(`${id}: nessun arrivo offerto in salita`, r.climbingArrivals === 0, `${r.climbingArrivals} arrivi offerti in salita`);
   // i conflitti programmati vengono consegnati e, senza interventi, si presentano davvero

@@ -231,13 +231,41 @@
   .intro { max-width: 34em; color: var(--muted); font-size: 18px; margin: 0; }
 
   /* il radar vero, che si accende quando arriva sullo schermo */
-  .radar-sec { padding-top: 48px; text-align: center; }
-  .radar-sec .intro { margin: 0 auto 44px; }
-  .monitor { position: relative; max-width: 1180px; margin: 0 auto; }
-  .monitor video { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #04080d; }
+  .radar-sec { padding-top: 0; text-align: center; }
+  .radar-sec .intro { margin: 0 auto; }
+
+  /* la fascia cinematografica: il radar vero del simulatore ripreso come un monitor in sala
+     (tools/radar-cinema.mjs), a tutta larghezza, con i bordi che sfumano nel fondo */
+  .cinema { position: relative; height: clamp(440px, 80vh, 780px); margin-bottom: clamp(28px, 5vw, 64px); overflow: hidden; }
+  /* la sfumatura sta su un contenitore fermo, non sul video ingrandito: così i bordi sfumano davvero
+     nel fondo (e nella carta di sfondo), senza veli di colore pieno */
+  .cinema-film {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 20%, #000 86%, transparent 100%), linear-gradient(180deg, transparent 0, #000 22%, #000 64%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image: linear-gradient(90deg, transparent 0, #000 20%, #000 86%, transparent 100%), linear-gradient(180deg, transparent 0, #000 22%, #000 64%, transparent 100%);
+    mask-composite: intersect;
+  }
+  .cinema video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 45%;
+    /* l'inquadratura vicina al settore è già nel video: qui solo una leggera spinta con lo scroll */
+    transform: scale(calc(1.01 + (1 - var(--p, 0.5)) * 0.05));
+    transform-origin: 50% 50%;
+    will-change: transform;
+  }
+  .cinema-copy { position: absolute; left: 0; right: 0; bottom: clamp(24px, 6vh, 64px); }
+  .cinema-copy h2 { font-size: clamp(36px, 5vw, 68px); text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85); }
+  .cinema-copy .intro { color: var(--text); text-shadow: 0 1px 10px rgba(0, 0, 0, 0.9); }
   /* Le sfumature delle immagini, una per una, secondo cosa mostrano (--o: 0 sul bordo dello schermo,
      1 quando l'immagine è ben dentro).
-     Schermi (radar, tutorial): si devono leggere tutti, quindi solo un bordo morbido che si stringe
+     Schermate (tutorial): si devono leggere tutte, quindi solo un bordo morbido che si stringe
      quando arrivano al centro. */
   .feather {
     --fx: calc(var(--f0, 12%) - var(--o, 1) * var(--f1, 8%));
@@ -247,26 +275,11 @@
     mask-image: linear-gradient(90deg, transparent 0, #000 var(--fx), #000 calc(100% - var(--fx)), transparent 100%), linear-gradient(180deg, transparent 0, #000 var(--fy), #000 calc(100% - var(--fy)), transparent 100%);
     mask-composite: intersect;
   }
-  .js .monitor .screen { clip-path: inset(49.6% 0 49.6% 0); filter: brightness(2.2) saturate(0.2); transition: clip-path 0.9s var(--ease) 0.15s, filter 1.4s var(--ease) 0.35s; }
-  .js .monitor.on .screen { clip-path: inset(0 0 0 0); filter: none; }
-  .js .monitor::before {
-    /* la riga luminosa del tubo che si accende */
-    content: "";
+  .cinema .live {
     position: absolute;
-    left: 6px;
-    right: 6px;
-    top: 50%;
-    height: 2px;
-    background: #bff3ff;
-    transform: scaleX(0);
-    transition: transform 0.45s var(--ease), opacity 0.6s ease 0.5s;
-    z-index: 1;
-  }
-  .js .monitor.on::before { transform: scaleX(1); opacity: 0; }
-  .monitor .live {
-    position: absolute;
-    right: 18px;
-    top: 16px;
+    z-index: 2;
+    right: max(20px, calc((100% - 1160px) / 2));
+    top: clamp(28px, 8vh, 72px);
     font: 700 11.5px/1 var(--mono);
     letter-spacing: 0.08em;
     color: var(--green);
@@ -274,7 +287,7 @@
     padding: 6px 8px;
     border: 1px solid rgba(124, 252, 154, 0.4);
   }
-  .monitor .live::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--green); }
+  .cinema .live::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--green); }
   .legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; max-width: 1080px; margin: 34px auto 0; text-align: left; }
   .legend p { margin: 0; color: var(--muted); font-size: 15.5px; }
   .legend b { display: block; font: 700 16px/1.3 var(--mono); margin-bottom: 4px; }
@@ -379,7 +392,6 @@
   .backdrop .glow { position: absolute; border-radius: 50%; will-change: transform; }
   .backdrop .g1 { width: 95vmax; height: 95vmax; left: -30vmax; top: 20vh; background: radial-gradient(closest-side, rgba(40, 125, 165, 0.11), rgba(40, 125, 165, 0)); transform: translate3d(0, var(--g1, 0px), 0); }
   .backdrop .g2 { width: 80vmax; height: 80vmax; right: -25vmax; top: 60vh; background: radial-gradient(closest-side, rgba(60, 160, 120, 0.07), rgba(60, 160, 120, 0)); transform: translate3d(0, var(--g2, 0px), 0); }
-  .monitor { transform: perspective(1400px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); }
   .tilt .shot { position: relative; }
 
   /* titoli che salgono parola per parola */
@@ -421,7 +433,6 @@
   @media (max-width: 700px) {
     .hero h1 { font-size: 30px; }
     .bar nav a:not(:last-child) { display: none; }
-    .monitor .live { top: 12px; right: 12px; font-size: 11px; padding: 4px 6px; letter-spacing: 0.04em; }
     .facts li { grid-template-columns: 1fr; gap: 2px; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -429,7 +440,6 @@
     *, *::before, *::after { animation: none !important; transition: none !important; }
     .js [data-reveal] { opacity: 1; transform: none; filter: none; }
     .js .hero h1 span { clip-path: none; }
-    .js .monitor .screen { clip-path: none; filter: none; }
     .room-art img, .tilt .shot { transform: none; }
     .js h2[data-reveal] .w { opacity: 1; transform: none; filter: none; }
     .js .art[data-reveal] img { scale: 1; }
@@ -477,17 +487,20 @@
   </section>
 
   <section class="radar-sec" id="radar">
-    <div class="wrap">
-      <h2 class="mono" data-reveal>Ogni puntino è un volo.</h2>
-      <p class="intro" data-reveal style="--d: 1">Il colore del tag ti dice di chi è.</p>
-      <div class="monitor" id="monitor" data-scroll>
-        <div class="screen feather" style="--f0: 10%; --f1: 7%">
-          <video id="radar-video" muted loop playsinline preload="none" poster="img/radar-video.jpg" width="2260" height="1640" aria-label="Il radar di ACS Simulator in movimento: i voli avanzano sul settore NW Alto di Roma ACC; un volo magenta viene preso in carico e diventa verde">
-            <source src="img/radar.webm" type="video/webm" />
-          </video>
-        </div>
-        <span class="live">SIMULAZIONE · 8×</span>
+    <div class="cinema" id="cinema" data-scroll>
+      <div class="cinema-film">
+        <video id="cinema-video" muted loop playsinline preload="none" poster="img/radar-cinema.jpg" width="1920" height="1080" aria-label="Il radar di ACS Simulator in movimento: i voli avanzano sul settore NW Alto di Roma ACC, con i tag gialli, magenta e verdi">
+          <source src="img/radar-cinema-720.mp4" type="video/mp4" media="(max-width: 900px)" />
+          <source src="img/radar-cinema.mp4" type="video/mp4" />
+        </video>
       </div>
+      <span class="live">SIMULAZIONE · 8×</span>
+      <div class="wrap cinema-copy">
+        <h2 class="mono" data-reveal>Ogni puntino è un volo.</h2>
+        <p class="intro" data-reveal style="--d: 1">Il colore del tag ti dice di chi è.</p>
+      </div>
+    </div>
+    <div class="wrap">
       <div class="legend">
         <p data-reveal><b class="c-yellow">Giallo</b>Di un altro settore. Passa vicino, ma non è tuo.</p>
         <p data-reveal style="--d: 1"><b class="c-magenta">Magenta</b>Te lo stanno passando. Un clic e lo prendi.</p>
@@ -783,29 +796,27 @@
       updateScrolled();
     }
 
-    // --- il radar: si accende quando arriva sullo schermo, e il video gira solo finché si vede ------
-    var monitor = document.getElementById('monitor');
-    var video = document.getElementById('radar-video');
-    var radarSeen = false;
-    function syncVideo() {
-      if (radarSeen && !document.hidden) {
-        video.preload = 'auto';
-        var pr = video.play();
+    // --- la fascia cinematografica: parte quando si vede, si ferma quando esce ---------------------
+    // Il video torna da solo al punto di partenza: il loop del browser non fa salti.
+    var cinema = document.getElementById('cinema');
+    var film = document.getElementById('cinema-video');
+    var filmSeen = false;
+    function syncFilm() {
+      if (filmSeen && !document.hidden && !still) {
+        film.preload = 'auto';
+        var pr = film.play();
         if (pr && pr.catch) pr.catch(function () {});
-      } else if (!video.paused) {
-        video.pause();
+      } else if (!film.paused) {
+        film.pause();
       }
     }
-    if (!('IntersectionObserver' in window)) {
-      monitor.classList.add('on');
-    } else {
+    if ('IntersectionObserver' in window) {
       new IntersectionObserver(function (entries) {
-        radarSeen = entries[0].isIntersecting;
-        if (radarSeen) monitor.classList.add('on');
-        syncVideo();
-      }, { threshold: 0.35 }).observe(monitor);
+        filmSeen = entries[0].isIntersecting;
+        syncFilm();
+      }, { threshold: 0.2 }).observe(cinema);
     }
-    document.addEventListener('visibilitychange', syncVideo);
+    document.addEventListener('visibilitychange', syncFilm);
 
     // --- la testata: profondità col mouse, pulviscolo, frequenza radio -----------------------------
     var hero = document.getElementById('hero');
