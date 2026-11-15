@@ -2100,11 +2100,34 @@ export class Simulation {
       const now = hit(g, g.altitude, 0);
       if (now) return now;
     }
+    // Un volo in contatto uscito dal settore senza hand-off resta nostro per MISSED_HANDOFF_GRACE_S, poi diventa
+    // un hand-off mancato (_updateControl): finché è nostro, un ingresso in zona è un errore anche fuori dal
+    // settore (tipico: vettorato con una prua oltre il confine, verso una zona appena di là). La previsione lo
+    // segue per lo stesso tempo, non per una distanza: con 3 NM a 450 kt si fermava prima dei 30 s e l'allarme
+    // si accendeva e spegneva o non si accendeva affatto.
+    const reachedIn = () => g.entryS === null || (g._along ?? g.alongTrackNm()) >= g.entryS - ENTRY_TOLERANCE_NM;
+    let wasInside = !!g.wasInside;
+    let wasLateral = !!g.wasLateral;
+    let outsideS = g.control === 'assumed' && g.outsideSince != null ? this.simTime - g.outsideSince : null;
     for (let t = AREA_PREDICT_STEP_S; t <= horizonS; t += AREA_PREDICT_STEP_S) {
       const prev = { x: g.x, y: g.y, alt: g.altitude };
       stepGhost(g, AREA_PREDICT_STEP_S);
-      if (anywhere || insideLateral(g)) seenInside = true;
-      else if (seenInside && distanceFromSector(g) > EXCURSION_TOLERANCE_NM && !ghostExcursion(g)) return null;
+      const lateral = insideLateral(g);
+      if (anywhere || lateral) seenInside = true;
+      if (!anywhere && g.control === 'assumed') {
+        const volume = insideVolume(g);
+        const away = ((!volume && wasInside) || (!lateral && wasLateral)) && !(!lateral && ghostExcursion(g));
+        if (volume && reachedIn()) wasInside = true;
+        if (lateral && reachedIn()) wasLateral = true;
+        // fuori da al massimo un passo quando lo si vede la prima volta: si conta da zero e si tiene un passo in
+        // più, così il campionamento non decide se un ingresso al limite dei 30 s si vede o no (l'allarme
+        // lampeggerebbe a ogni ricalcolo); al più si avvisa per un ingresso che arriverebbe poco dopo l'hand-off
+        // mancato, che è comunque un errore
+        outsideS = away ? (outsideS === null ? 0 : outsideS + AREA_PREDICT_STEP_S) : null;
+        if (outsideS !== null && outsideS > MISSED_HANDOFF_GRACE_S + AREA_PREDICT_STEP_S) return null;
+      } else if (!anywhere && !lateral && seenInside && distanceFromSector(g) > EXCURSION_TOLERANCE_NM && !ghostExcursion(g)) {
+        return null;
+      }
       if (!seenInside) continue;
       // prima il punto a metà del passo (in linea retta: in dieci secondi il volo vira poco), poi il campione
       const mid = { x: (prev.x + g.x) / 2, y: (prev.y + g.y) / 2 };
