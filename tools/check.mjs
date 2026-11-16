@@ -81,6 +81,8 @@ const landing = fs.existsSync(path.join(ROOT, 'site/index.html')) ? fs.readFileS
 check('la pagina rimanda al simulatore e ai download', landing.includes('href="play/"') && landing.includes('/releases/latest'));
 const siteHtml = fs.readFileSync(path.join(ROOT, '_site/index.html'), 'utf8');
 const playHtml = fs.readFileSync(path.join(ROOT, '_site/play/index.html'), 'utf8');
+check('Search Console: file di verifica e sitemap pubblicati',
+  fs.existsSync(path.join(ROOT, '_site/googlebf097e71d14ab1cc.html')) && fs.existsSync(path.join(ROOT, '_site/sitemap.xml')));
 check('il sito e il gioco nel browser contano le visite', siteHtml.includes('goatcounter') && playHtml.includes('goatcounter'));
 check('il programma da scaricare non contiene contatori',
   !fs.readFileSync(path.join(ROOT, 'renderer/index.html'), 'utf8').includes('goatcounter')
