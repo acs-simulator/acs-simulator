@@ -861,8 +861,9 @@ export const LESSONS = [
         title: 'Il trasferimento',
         text: `Un volo in emergenza si passa <b>a voce</b> all'ente successivo: il livello d'uscita e il punto
           non contano più, e un hand-off "sbagliato" <b>non è un errore</b>.<br><br>
-          Caso a parte: l'<b>avaria radio</b> (7600). Il volo non ti sente più: mantiene livello e rotta per
-          sette minuti, poi riprende il piano di volo. A te resta il compito di <b>svuotargli la strada</b>.`,
+          Caso a parte: l'<b>avaria radio</b> (7600). Il volo non ti sente più e non esegue nessuna istruzione:
+          mantiene l'ultimo livello e l'ultima velocità assegnati per 20 minuti (se era su una prua torna sulla rotta),
+          poi riprende il piano di volo, prosegue verso la destinazione, scende all'orario stimato e atterra. A te resta il compito di <b>svuotargli la strada</b>.`,
       },
     ],
   },

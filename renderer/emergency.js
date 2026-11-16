@@ -5,8 +5,10 @@
 // d'uscita e nuovo ente successivo, come per una normale uscita dal basso verso l'avvicinamento.
 // Il controllore deve autorizzare la discesa e passare il volo. Se la discesa non arriva, le avarie gravi
 // scendono lo stesso: il pilota naviga come ritiene appropriato e avvisa l'ATC.
-// L'avaria radio (7600) non parla: mantiene livello e velocità per 7 minuti, poi riprende il piano di volo
-// e non accetta più istruzioni.
+// L'avaria radio (7600, volo IFR in IMC) non parla e non esegue più nessuna istruzione: mantiene l'ultimo livello
+// e l'ultima velocità assegnati per 20 minuti, poi riprende il piano di volo (livello e velocità del piano), procede
+// verso la destinazione, comincia la discesa all'orario stimato d'arrivo e atterra. Se era su una prua assegnata,
+// rientra subito sulla rotta del piano di volo.
 
 import { airspace, unitAt, sectorAt, distance } from './airspace.js';
 import { bottomTransferFL } from './sectors.js';
@@ -18,7 +20,7 @@ export const EMERGENCY_PCT_DEFAULT = 2;
 export const EMERGENCY_PCT_MAX = 10;
 export const EMERGENCY_FIRST_MIN_S = 480;
 export const EMERGENCY_MIN_ASSUMED_S = 90;     // il volo deve essere in contatto da almeno così
-export const RADIO_FAILURE_HOLD_S = 420;       // 7 minuti al livello assegnato prima di riprendere il piano
+export const RADIO_FAILURE_HOLD_S = 1200;      // 20 minuti a livello e velocità assegnati prima di riprendere il piano
 
 const DIVERT_MAX_NM = 260;
 const DIVERT_BEHIND_NM = 45;   // penalità per un aeroporto alle spalle del volo
@@ -96,7 +98,7 @@ export const EMERGENCY_TYPES = [
     perf: { descent: 1, climb: 1, speed: 1 },
     targetFL: (ac) => ac.clearedFL,
     request: (ac) => `${ac.callsign} no reply, squawk 7600: maintaining ${fmtFl(ac.clearedFL)} `
-      + 'and assigned speed',
+      + 'and assigned speed for 20 min, then flight plan',
   },
 ];
 
@@ -188,7 +190,17 @@ export function declareEmergency(ac, simTime, type = weightedType(EMERGENCY_TYPE
   if (type.id === 'radio') {
     // livello concordato per telefono con l'ente successivo: quello che il volo sta mantenendo
     ac.requestedExitFL = ac.clearedFL;
+    // velocità: l'ultima assegnata, oppure quella che stava tenendo; da qui resta fissa (anche il Mach)
+    if (ac.speedMode !== 'assigned') ac.assignedSpeed = Math.round(ac.speed);
     ac.speedMode = 'assigned';
+    // livello: l'ultimo autorizzato (una salita o discesa già in corso verso di esso si completa), con il rateo
+    // normale del tipo
+    ac.assignedRateFpm = null;
+    // rotta: chi era su una prua assegnata rientra sulla rotta del piano di volo; nessuna richiesta in sospeso
+    ac.mode = 'route';
+    ac.turnDirection = null;
+    ac.request = null;
+    e.holdLeftS = RADIO_FAILURE_HOLD_S;
   }
   e.request = type.request(ac, e);
   return e;
@@ -204,9 +216,9 @@ export function emergencyStatus(ac) {
   const e = ac.emergency;
   if (!e) return '';
   if (!e.radio) {
-    return e.phase === 'resumed'
-      ? `no contact, flight plan level ${fmtFl(ac.clearedFL)}`
-      : `no contact, maintaining ${fmtFl(ac.clearedFL)}`;
+    if (e.phase === 'resumed') return `no contact, flight plan ${fmtFl(ac.clearedFL)} to ${ac.destination}`;
+    const min = Math.max(1, Math.ceil((e.holdLeftS ?? 0) / 60));
+    return `no contact, maintaining ${fmtFl(ac.clearedFL)}, flight plan in ${min} min`;
   }
   if (e.phase === 'own') return `descending ${fmtFl(e.targetFL)} on own`;
   if (e.phase === 'cleared') return `cleared ${fmtFl(ac.clearedFL)}`;
