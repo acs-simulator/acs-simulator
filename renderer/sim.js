@@ -643,6 +643,25 @@ function transferredAltitude(ac, profileFt, phase) {
   return profileFt;
 }
 
+// Avaria radio (7600): nessuno può più dare istruzioni al volo. Per 20 minuti (holdLeftS > 0) mantiene l'ultimo
+// livello e l'ultima velocità assegnati; poi riprende il piano di volo: livello di crociera richiesto e discesa
+// verso la destinazione lungo il profilo pianificato (cioè all'orario stimato d'arrivo), velocità propria.
+// Vale finché il volo è in contatto con noi e dopo che l'abbiamo passato, anche nelle previsioni.
+function radioFailureStep(ac, holdLeftS, profileFt, phase) {
+  ac.mode = 'route';
+  ac.turnDirection = null;
+  ac.resolution = null;
+  if (holdLeftS > 0) {
+    ac.speedMode = 'assigned';
+    return;
+  }
+  ac.speedMode = 'own';
+  ac.assignedMach = null;
+  const rflFt = Math.min(ac.rfl ?? ac.clearedFL, ac.type.maxFL) * 100;
+  // il profilo è già in discesa: scende con lui; altrimenti sale o scende al livello del piano di volo
+  ac.assignedAltitude = phase === 'descent' ? Math.min(ac.assignedAltitude, rflFt, profileFt) : rflFt;
+}
+
 // Avanzamento di una copia per le previsioni: gli enti non di competenza seguono il profilo pianificato,
 // quello precedente trattiene il volo al livello coordinato, i voli in contatto mantengono l'autorizzazione.
 function stepGhost(g, dt) {
@@ -655,6 +674,13 @@ function stepGhost(g, dt) {
   }
   // uscita sul punto iniziale della STAR: passato all'avvicinamento quando ci arriva
   if (g.control === 'assumed' && g.exitKind === 'star' && !g.route.includes(g.exitFix)) g.control = 'transferred';
+  if (g.emergency?.radio === false && (g.control === 'assumed' || g.control === 'transferred')) {
+    g._radioHold = (g._radioHold ?? g.emergency.holdLeftS ?? 0) - dt;
+    const profileFt = Math.round(profileAltitude(g.profile, g._along) / 100) * 100;
+    radioFailureStep(g, g._radioHold, profileFt, profilePhase(g.profile, g._along));
+    g.update(dt);
+    return;
+  }
   if (g.xflMode && (g.control === 'assumed' || (OURS.has(g.control) && nearBand && insideLateral(g)))) {
     // ipotesi per i conflitti al livello d'uscita: il controllore autorizza il volo all'XFL appena lo assume
     g.assignedAltitude = g.requestedExitFL * 100;
@@ -1468,10 +1494,14 @@ export class Simulation {
   }
 
   // Seguito dell'emergenza: discesa autorizzata, discesa iniziata dal pilota se l'autorizzazione non arriva,
-  // avaria radio che riprende il piano di volo dopo 7 minuti, fine dell'emergenza all'hand-off.
-  _updateEmergency(ac) {
+  // avaria radio che riprende il piano di volo dopo 20 minuti, fine dell'emergenza all'hand-off.
+  _updateEmergency(ac, dt) {
     const e = ac.emergency;
     if (!e) return;
+    if (!e.radio) {
+      this._updateRadioFailure(ac, dt);
+      return;
+    }
     if (ac.control !== 'assumed') {
       if (e.phase !== 'handed') {
         e.phase = 'handed';
@@ -1480,23 +1510,6 @@ export class Simulation {
           this._message(ac, `${ac.callsign} transferred to ${ac.nextUnit}, ${fmtFl(ac.clearedFL)}, `
             + 'by phone', 'info');
         }
-      }
-      return;
-    }
-
-    if (!e.radio) {
-      // livello e velocità assegnati per 7 minuti, poi il livello del piano di volo
-      if (e.resumeAt !== null && this.simTime >= e.resumeAt) {
-        e.resumeAt = null;
-        e.phase = 'resumed';
-        const fl = Math.max(50, Math.min(ac.rfl ?? ac.clearedFL, ac.type.maxFL));
-        ac.assignedAltitude = fl * 100;
-        ac.requestedExitFL = fl;   // livello concordato per telefono con l'ente successivo
-        ac.speedMode = 'own';      // senza radio il volo riprende la propria velocità da solo
-        ac.assignedMach = null;
-        this._dropMessage(e.message);
-        e.message = this._message(ac, `${ac.callsign} 7600: resuming ${fmtFl(fl)}, coordinated with `
-          + `${ac.nextUnit}`, 'warn', true);
       }
       return;
     }
@@ -1519,6 +1532,36 @@ export class Simulation {
       e.message = this._message(ac, `${ac.callsign} descending ${fmtFl(e.targetFL)} without clearance`,
         'mayday', true);
       this._emit('event', { type: 'emergency-descent', ac, emergency: e });
+    }
+  }
+
+  // Avaria radio (7600): il volo esegue la regola da solo (radioFailureStep), in contatto con noi e dopo l'hand-off.
+  // Al controllore restano gli avvisi: la chiamata iniziale, il ritorno al piano di volo dopo 20 minuti (se il volo
+  // è ancora nostro, con il nuovo livello d'uscita concordato per telefono) e il passaggio all'ente successivo.
+  _updateRadioFailure(ac, dt) {
+    const e = ac.emergency;
+    e.holdLeftS = Math.max(0, (e.holdLeftS ?? 0) - dt);
+    const s = ac.alongTrackNm();
+    const profileFt = Math.round(profileAltitude(ac.profile, s) / 100) * 100;
+    if (ac.control === 'assumed') radioFailureStep(ac, e.holdLeftS, profileFt, profilePhase(ac.profile, s));
+    if (e.holdLeftS <= 0 && e.phase !== 'resumed' && e.phase !== 'handed-resumed') {
+      const handed = e.phase === 'handed';
+      e.phase = handed ? 'handed-resumed' : 'resumed';
+      if (!handed && ac.control === 'assumed') {
+        const fl = Math.round(ac.assignedAltitude / 100);
+        ac.requestedExitFL = fl;   // livello concordato per telefono con l'ente successivo
+        this._dropMessage(e.message);
+        e.message = this._message(ac, `${ac.callsign} 7600: 20 min elapsed, resuming flight plan ${fmtFl(fl)} `
+          + `to ${ac.destination}, coordinated with ${ac.nextUnit}`, 'warn', true);
+      }
+    }
+    if (ac.control !== 'assumed' && e.phase !== 'handed' && e.phase !== 'handed-resumed') {
+      e.phase = e.holdLeftS > 0 ? 'handed' : 'handed-resumed';
+      this._dropMessage(e.message);
+      if (ac.control === 'transferred') {
+        this._message(ac, `${ac.callsign} 7600 transferred to ${ac.nextUnit} by phone, ${fmtFl(ac.clearedFL)}`
+          + (e.holdLeftS > 0 ? `, flight plan in ${Math.ceil(e.holdLeftS / 60)} min` : ''), 'info');
+      }
     }
   }
 
@@ -2065,6 +2108,9 @@ export class Simulation {
       } else {
         ac.levelledAtXflSince = null;
       }
+    } else if (ac.control === 'transferred' && ac.emergency?.radio === false) {
+      // avaria radio passata all'ente successivo: nessuno può istruirlo, segue la regola del 7600
+      radioFailureStep(ac, ac.emergency.holdLeftS, profileFt, profilePhase(ac.profile, s));
     } else if (ac.control === 'transferred') {
       // l'ente successivo riporta il volo sul suo profilo, sulla rotta e sulla velocità propria
       const elapsed = this.simTime - ac.transferredAt;
@@ -2508,7 +2554,7 @@ export class Simulation {
     for (const ac of this.aircraft) {
       ac.update(dt);
       this._updateControl(ac);
-      this._updateEmergency(ac);
+      this._updateEmergency(ac, dt);
     }
     this._emergencyTick();
 
