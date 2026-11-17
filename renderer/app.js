@@ -483,6 +483,7 @@ function startGame(sectorId, settings = sessionSettings(), lesson = null) {
 
   sim.on('event', (event) => {
     const { type, ac, correct } = event;
+    if (type === 'offer-withdrawn') toast(`${ac.callsign} will not enter your sector: offer withdrawn by ${ac.prevUnit ?? 'previous unit'}`, 'info');
     if (type === 'offered') toast(`${ac.callsign} from ${ac.prevUnit ?? 'previous unit'}: click the tag to assume`, 'offered');
     if (type === 'handoff' && correct) toast(`✓ ${ac.callsign} transferred to ${ac.nextUnit}, ${fmtFl(ac.clearedFL)}`, 'ok');
     // un volo in emergenza si passa a voce: il livello e l'uscita non contano come errore e la riga
