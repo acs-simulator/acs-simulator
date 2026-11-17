@@ -851,6 +851,14 @@ function findWaypointAt(t, x, y) {
 //   Mappa   menu dei filtri: punti FRA e zone non attive.
 const DOUBLE_CLICK_MS = 450;
 let lastNameClick = { ac: null, t: 0 }; // ultimo clic su un nominativo, per riconoscere il doppio clic
+// Un clic sul nominativo seleziona il volo (traccia cerchiata e rotta celeste) solo se non arriva il secondo clic
+// entro DOUBLE_CLICK_MS: il doppio clic accende o spegne lo spadino e basta, senza aprire anche la rotta.
+let pendingSelect = null;
+
+function cancelPendingSelect() {
+  if (pendingSelect) clearTimeout(pendingSelect);
+  pendingSelect = null;
+}
 // { mode: 'tag' | 'track', ac, onTrack, grabDx, grabDy, startX, startY, x, y, moved }
 let dragState = null;
 let measures = [];    // linee R&B fissate: { a, b }, ciascun estremo un aereo oppure un punto della mappa {x, y}
@@ -959,6 +967,7 @@ canvas.addEventListener('mousedown', (ev) => {
 
 // Clic sulla mappa vuota: con l'etichetta aperta un punto FRA si sceglie per la rotta, altrimenti si deseleziona.
 function emptyClick(t, x, y) {
+  cancelPendingSelect();
   const wp = labelPanel.aircraft && findWaypointAt(t, x, y);
   if (!wp || !labelPanel.pickWaypoint(wp.id)) labelPanel.deselect();
 }
@@ -983,8 +992,19 @@ function endDrag(ev) {
     const onName = tagNameAt(state.x, state.y) === state.ac;
     const double = onName && lastNameClick.ac === state.ac && clickAt - lastNameClick.t < DOUBLE_CLICK_MS;
     lastNameClick = onName && !double ? { ac: state.ac, t: clickAt } : { ac: null, t: 0 };
-    labelPanel.select(state.ac, false);
-    if (double) state.ac.showVector = !state.ac.showVector;
+    cancelPendingSelect();
+    if (double) {
+      state.ac.showVector = !state.ac.showVector;
+    } else if (onName && labelPanel.aircraft !== state.ac) {
+      // primo clic sul nominativo di un volo non selezionato: la selezione aspetta un eventuale secondo clic
+      const { ac } = state;
+      pendingSelect = setTimeout(() => {
+        pendingSelect = null;
+        if (sim && sim.aircraft.includes(ac)) labelPanel.select(ac, false);
+      }, DOUBLE_CLICK_MS);
+    } else {
+      labelPanel.select(state.ac, false);
+    }
   } catch (err) {
     console.error('Errore nell\'apertura dell\'etichetta', err);
   }
@@ -1134,7 +1154,10 @@ function cancelAction() {
   else if (tagMenu) closeTagMenu();
   else if (popupOpen()) showPopup(null);
   else if (tool) setTool(null);
-  else labelPanel.deselect();
+  else {
+    cancelPendingSelect();
+    labelPanel.deselect();
+  }
 }
 
 // --- menu a tendina sui valori del tag -------------------------------------
