@@ -19,7 +19,7 @@
     "start": "electron .",
     "test": "node tools/check.mjs",
     "dist": "electron-builder --publish never",
-    "dist:mac": "electron-builder --mac --arm64 --publish never && electron-builder --mac --x64 --publish never",
+    "dist:mac": "electron-builder --mac --arm64 --publish never && electron-builder --mac --x64 --publish never -c.dmg.title='${productName} ${version} Intel'",
     "dist:win": "electron-builder --win --publish never",
     "dist:linux": "electron-builder --linux --publish never",
     "pack": "electron-builder --dir --publish never",
@@ -50,13 +50,7 @@
     "mac": {
       "category": "public.app-category.simulation-games",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
+        "dmg"
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
