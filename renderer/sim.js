@@ -46,6 +46,11 @@ const EXIT_POINT_TOLERANCE_NM = 8; // scostamento laterale massimo dal punto d'u
 const XFL_LEVEL_WARN_S = 30;       // uscita dall'alto o dal basso: volo livellato all'XFL e ancora in contatto
 const TRANSFER_BELOW_FT = 2000;    // l'ente inferiore porta subito il volo almeno così sotto il nostro limite
 const TAKEOVER_S = 20;             // dopo l'hand-off l'ente successivo comincia a dare le sue istruzioni
+const OFFER_CHECK_S = 4;           // ogni quanto si prevede se un volo in arrivo sta per entrare nel settore
+const OFFER_BAND_FT = 1000;        // ...arrivandoci al più così sotto o sopra i limiti verticali
+const WITHDRAW_CHECK_S = 10;       // ogni quanto si controlla se un volo in arrivo entrerà ancora nel settore
+const WITHDRAW_HORIZON_S = 300;    // ...entro questo tempo, prima che l'ente precedente lo tenga per sé
+const WITHDRAW_PAST_NM = 5;        // ...una volta passato il punto d'ingresso pianificato
 // Controllori degli altri settori: si accorgono dei conflitti fra i loro voli (o con i nostri) e li risolvono
 // fermando una salita o una discesa, cambiando livello di 1000 ft o, in scia, riducendo la velocità.
 const RESOLVE_EVERY_S = 10;
@@ -301,6 +306,7 @@ export class Aircraft {
     this.routeLimitFix = plan.routeLimitFix ?? null; // oltre questo punto la rotta è di altri enti
     this.prevUnit = plan.prevUnit ?? null;
 
+    this.profileS = null; // distanza lungo il piano per il profilo verticale (vedi Simulation._updateControl)
     this.mode = 'route'; // 'route' | 'heading'
     this.assignedHeading = plan.heading;
     this.turnDirection = null; // 'left' | 'right' | null (lato più breve)
@@ -666,7 +672,7 @@ function radioFailureStep(ac, holdLeftS, profileFt, phase) {
 // quello precedente trattiene il volo al livello coordinato, i voli in contatto mantengono l'autorizzazione.
 function stepGhost(g, dt) {
   // distanza lungo il piano aggiornata in modo incrementale (più rapido che ricalcolarla dalla rotta)
-  g._along = g._along === undefined ? g.alongTrackNm() : g._along + (g.speed * dt) / 3600;
+  g._along = g._along === undefined ? Math.max(g.profileS ?? 0, g.alongTrackNm()) : g._along + (g.speed * dt) / 3600;
   const nearBand = g.altitude >= airspace.floorFt - 3000 && g.altitude < airspace.ceilingFt + 3000;
   // uscita dall'alto o dal basso: il controllore passa il volo all'ente successivo quando arriva all'XFL
   if (g.xflMode && g.control === 'assumed' && g.verticalExit && Math.abs(g.altitude - g.requestedExitFL * 100) < 300) {
@@ -1541,7 +1547,7 @@ export class Simulation {
   _updateRadioFailure(ac, dt) {
     const e = ac.emergency;
     e.holdLeftS = Math.max(0, (e.holdLeftS ?? 0) - dt);
-    const s = ac.alongTrackNm();
+    const s = ac.profileS ?? ac.alongTrackNm();
     const profileFt = Math.round(profileAltitude(ac.profile, s) / 100) * 100;
     if (ac.control === 'assumed') radioFailureStep(ac, e.holdLeftS, profileFt, profilePhase(ac.profile, s));
     if (e.holdLeftS <= 0 && e.phase !== 'resumed' && e.phase !== 'handed-resumed') {
@@ -2042,6 +2048,51 @@ export class Simulation {
 
   // --- avanzamento -----------------------------------------------------------
 
+  // Il volo ci viene offerto quando sta davvero per entrare nel nostro volume. Si prevede la sua traiettoria
+  // (con la rotta o la prua che sta seguendo e i livelli dell'ente precedente) invece di contare sulla distanza
+  // lungo il piano: quella sbaglia di decine di miglia quando il volo devia per un temporale, rientra in rotta
+  // con un diretto che salta dei punti o taglia una virata, e il volo ci verrebbe offerto lontano dal settore o
+  // senza entrarci mai. Ingresso laterale: dentro il confine e nella fascia del settore (±OFFER_BAND_FT) entro
+  // OFFER_LEAD_S. Ingresso dal basso o dall'alto: il volo è sotto o sopra il settore e ci arriva salendo o
+  // scendendo quando l'ente precedente lo libera, quindi conta anche il profilo pianificato.
+  _offerDue(ac, inside, s) {
+    if (inside) return true;
+    const vertical = ac.entryKind === 'below' || ac.entryKind === 'above';
+    // (il punto d'ingresso dal basso o dall'alto è dove il profilo attraversa il nostro limite: conta la distanza
+    // del profilo, che durante una deviazione continua ad avanzare)
+    const along = Math.max(s, ac.profileS ?? s);
+    if (vertical && ((ac.entryS - along) / Math.max(ac.speed, 1)) * 3600 > OFFER_LEAD_S) return false;
+    if (vertical && insideLateral(ac)) return true;
+    if (distanceFromSector(ac) > (ac.speed * OFFER_LEAD_S) / 3600 + 3) return false;
+    if (this.simTime < (ac._offerCheckAt ?? 0)) return false;
+    ac._offerCheckAt = this.simTime + OFFER_CHECK_S;
+    return this._predictEntry(ac, OFFER_LEAD_S, !vertical) !== null;
+  }
+
+  // Secondi fra adesso e il primo istante in cui la traiettoria prevista del volo è dentro il confine laterale
+  // del settore (band: anche nella fascia verticale, con OFFER_BAND_FT di tolleranza); null se non entro horizonS.
+  _predictEntry(ac, horizonS, band) {
+    const g = ac.ghost();
+    const ok = () => insideLateral(g) && (!band
+      || (g.altitude >= airspace.floorFt - OFFER_BAND_FT && g.altitude < airspace.ceilingFt + OFFER_BAND_FT));
+    if (ok()) return 0;
+    for (let t = PREDICT_STEP_S; t <= horizonS; t += PREDICT_STEP_S) {
+      stepGhost(g, PREDICT_STEP_S);
+      if (ok()) return t;
+    }
+    return null;
+  }
+
+  // Volo in arrivo (o già offerto) che ha passato il punto d'ingresso pianificato senza entrare e che, per come
+  // vola adesso, non entrerà nel settore: ha deviato per un temporale o ha tagliato l'angolo del confine.
+  _passageLost(ac, s) {
+    if (ac.entryS === null || Math.max(s, ac.profileS ?? s) < ac.entryS + WITHDRAW_PAST_NM || ac.wasLateral) return false;
+    if (this.simTime < (ac._withdrawCheckAt ?? 0)) return false;
+    ac._withdrawCheckAt = this.simTime + WITHDRAW_CHECK_S;
+    const vertical = ac.entryKind === 'below' || ac.entryKind === 'above';
+    return this._predictEntry(ac, WITHDRAW_HORIZON_S, !vertical) === null;
+  }
+
   _updateControl(ac) {
     const inside = insideVolume(ac);
     const lateral = insideLateral(ac);
@@ -2073,7 +2124,15 @@ export class Simulation {
       }
     }
 
-    const profileFt = Math.round(profileAltitude(ac.profile, s) / 100) * 100;
+    // Distanza lungo il piano per il profilo verticale: non torna mai indietro e, mentre il volo segue una prua
+    // (deviazione per un temporale), cresce con la strada percorsa. Quella calcolata dai punti di rotta rimasti
+    // resta ferma o cala quando il volo si allontana dalla rotta: un decollo che devia resterebbe a 1500 ft.
+    const dtc = ac._controlAt == null ? 0 : this.simTime - ac._controlAt;
+    ac._controlAt = this.simTime;
+    if (ac.profileS === null) ac.profileS = s;
+    else if (ac.mode === 'heading') ac.profileS += (ac.speed * dtc) / 3600;
+    ac.profileS = Math.max(ac.profileS, s);
+    const profileFt = Math.round(profileAltitude(ac.profile, ac.profileS) / 100) * 100;
 
     if (ac.control === 'other') {
       ac.assignedAltitude = profileFt;
@@ -2082,10 +2141,17 @@ export class Simulation {
       // l'ente precedente mantiene il volo sul livello coordinato
       ac.assignedAltitude = coordinatedAltitude(profileFt, ac.clamp, ac.entryFt);
       applyResolution(ac);
-      if (ac.control === 'inbound' && (inside || ((ac.entryS - s) / ac.speed) * 3600 <= OFFER_LEAD_S)) {
+      if (ac.control === 'inbound' && this._offerDue(ac, inside, s)) {
         ac.control = 'offered';
         ac.offeredAt = this.simTime;
         this._emit('event', { type: 'offered', ac });
+      } else if (!lateral && this._passageLost(ac, s)) {
+        // il volo non entrerà più nel nostro settore: l'ente precedente lo tiene e lo passa direttamente al
+        // successivo (se ce l'aveva già offerto, ritira l'offerta)
+        const was = ac.control;
+        ac.control = 'other';
+        ac.offeredAt = null;
+        if (was === 'offered') this._emit('event', { type: 'offer-withdrawn', ac });
       }
     } else if (ac.control === 'assumed') {
       ac.assumedAt ??= this.simTime;
@@ -2110,11 +2176,11 @@ export class Simulation {
       }
     } else if (ac.control === 'transferred' && ac.emergency?.radio === false) {
       // avaria radio passata all'ente successivo: nessuno può istruirlo, segue la regola del 7600
-      radioFailureStep(ac, ac.emergency.holdLeftS, profileFt, profilePhase(ac.profile, s));
+      radioFailureStep(ac, ac.emergency.holdLeftS, profileFt, profilePhase(ac.profile, ac.profileS));
     } else if (ac.control === 'transferred') {
       // l'ente successivo riporta il volo sul suo profilo, sulla rotta e sulla velocità propria
       const elapsed = this.simTime - ac.transferredAt;
-      if (elapsed > TAKEOVER_S) ac.assignedAltitude = transferredAltitude(ac, profileFt, profilePhase(ac.profile, s));
+      if (elapsed > TAKEOVER_S) ac.assignedAltitude = transferredAltitude(ac, profileFt, profilePhase(ac.profile, ac.profileS));
       if (elapsed > 40 && ac.mode === 'heading') ac.resumeOwnNavigation();
       if (elapsed > 40) ac.resumeOwnSpeed();
       if (elapsed > TAKEOVER_S) applyResolution(ac);
