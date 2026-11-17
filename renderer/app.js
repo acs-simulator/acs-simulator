@@ -849,10 +849,12 @@ function findWaypointAt(t, x, y) {
 //           sull'etichetta la toglie.
 //   Vettore lunghezza del vettore velocità, in minuti.
 //   Mappa   menu dei filtri: punti FRA e zone non attive.
-const DOUBLE_CLICK_MS = 450;
+const DOUBLE_CLICK_MS = 450;   // due clic sul nominativo entro così sono un doppio clic (lo spadino)
+const SELECT_DELAY_MS = 220;   // attesa del secondo clic prima di aprire la rotta: un doppio clic rapido sta qui dentro
 let lastNameClick = { ac: null, t: 0 }; // ultimo clic su un nominativo, per riconoscere il doppio clic
 // Un clic sul nominativo seleziona il volo (traccia cerchiata e rotta celeste) solo se non arriva il secondo clic
-// entro DOUBLE_CLICK_MS: il doppio clic accende o spegne lo spadino e basta, senza aprire anche la rotta.
+// entro SELECT_DELAY_MS: il doppio clic rapido accende o spegne lo spadino e basta, senza aprire anche la rotta. Un
+// doppio clic più lento (fino a DOUBLE_CLICK_MS) accende comunque lo spadino, ma la rotta a quel punto è già aperta.
 let pendingSelect = null;
 
 function cancelPendingSelect() {
@@ -1001,7 +1003,7 @@ function endDrag(ev) {
       pendingSelect = setTimeout(() => {
         pendingSelect = null;
         if (sim && sim.aircraft.includes(ac)) labelPanel.select(ac, false);
-      }, DOUBLE_CLICK_MS);
+      }, SELECT_DELAY_MS);
     } else {
       labelPanel.select(state.ac, false);
     }
