@@ -20,9 +20,11 @@ const TAG_LINE = 15;
 // nominativo verde finché l'ente successivo non lo accetta, poi tutto bianco. Bianco anche il traffico di altri
 // settori; giallo solo il traffico VFR (squawk 7000), di cui si leggono soltanto quota e velocità.
 export const COLORS = {
-  assumed: '#2EFF55',  // verde intenso: 14,6:1 sul fondo, 7,3:1 sul riquadro dell'hover, doppio del verde scuro
+  assumed: '#2EFF55',  // verde brillante, in contatto: 14,6:1 sul fondo, 10:1 sul riquadro dell'hover
   offered: '#ff5bd8',
-  inbound: '#00CC66',
+  // verde scuro, non ancora in contatto (convenzione ENAV: verde scuro, magenta, verde brillante): verde puro
+  // pieno come il #006400, schiarito quanto basta per leggersi sul fondo (5,2:1) e sull'hover (3,6:1)
+  inbound: '#009900',
   transferred: '#ffffff',
   notInContact: '#ffffff',
   vfr: '#e8d45a',
@@ -1150,7 +1152,7 @@ const DOWNLINK = '#45c8ee';                   // dati letti da bordo (ciano)
 const MISMATCH = '#ff9f40';                   // livello selezionato a bordo diverso dall'autorizzato
 const XFL_COLOR = '#d68cff';                  // livello d'uscita
 const XFL_EMPTY = '#e8eef0';
-const HOVER_BG = 'rgba(66, 74, 86, 0.9)';  // grigio scuro quanto basta perché i due verdi, il ciano e il viola si leggano
+const HOVER_BG = 'rgba(44, 50, 58, 0.92)'; // grigio scuro quanto basta perché anche il verde scuro (3,6:1) si legga
 const HOVER_BORDER = 'rgba(210, 218, 228, 0.7)';
 
 function cwOf(ctx) {

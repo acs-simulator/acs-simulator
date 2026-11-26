@@ -64,7 +64,7 @@ html, body {
 :root {
   --magenta: #ff5bd8;
   --traffic-yellow: #e8d45a;
-  --pending-green: #00CC66;
+  --pending-green: #009900;
   --contact-green: #2EFF55; /* voli in contatto, come sul radar (--green resta l'accento dell'interfaccia) */
 }
 
