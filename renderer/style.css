@@ -1294,6 +1294,11 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
   border-top: 1px solid #47505a;
 }
 
+.tag-menu.plain {
+  width: auto;
+  min-width: 72px;
+}
+
 .tag-menu-group:first-child {
   border-top: none;
 }

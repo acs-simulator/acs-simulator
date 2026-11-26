@@ -1172,18 +1172,12 @@ const range = (from, to, step) => {
 };
 const pad3 = (v) => String(v).padStart(3, '0');
 
-// Prossimo punto: solo i punti del piano di volo che restano, fino alla destinazione. I punti sorvolati in
-// navigazione escono dalla rotta; su prua assegnata la rotta resta ferma, quindi il primo è l'ultimo punto verso cui
-// il volo era diretto, anche se nel frattempo l'ha superato. Quelli oltre il punto d'uscita sono di altri enti: un
-// diretto lì è coordinato con l'ente successivo.
+// Prossimo punto: i nomi dei punti del piano di volo che restano, fino alla destinazione, anche oltre il settore
+// (un diretto oltre il punto d'uscita è coordinato con l'ente successivo). I punti sorvolati in navigazione escono
+// dalla rotta; su prua assegnata la rotta resta ferma, quindi il primo è l'ultimo punto verso cui il volo era
+// diretto, anche se nel frattempo l'ha superato.
 function fixItems(ac) {
-  const ahead = ac.route.map((id, idx) => ({ id, idx })).filter((r) => isFraPoint(r.id));
-  const limit = ac.exitIndex;
-  const inside = ahead.filter((r) => r.idx <= limit).map((r) => r.id);
-  const beyond = ahead.filter((r) => r.idx > limit).map((r) => r.id);
-  const items = [{ group: 'Piano di volo' }, ...inside];
-  if (beyond.length) items.push({ group: `Oltre ${ac.route[limit]}` }, ...beyond);
-  return items;
+  return ac.route.filter((id) => isFraPoint(id));
 }
 
 // Campi della label che si cliccano: titolo, valori (numeri, oppure {group} per un'intestazione), valore
@@ -1215,10 +1209,12 @@ const TAG_MENUS = {
     current: (ac) => Math.round(Math.abs(ac.verticalFpm ?? 0) / 100),
     format: (v) => String(v).padStart(2, '0'),
   },
+  // solo l'elenco dei punti, senza intestazione né valore attuale
   fix: {
     title: 'EFX',
+    plain: true,
     items: fixItems,
-    current: (ac) => (ac.mode === 'route' ? ac.route[0] ?? null : null),
+    current: () => null,
     format: (v) => v ?? '---',
   },
 };
@@ -1288,7 +1284,12 @@ function openTagMenu(field, x, y) {
     });
     list.appendChild(btn);
   }
-  el.append(head, title, now, list);
+  if (spec.plain) {
+    el.classList.add('plain');
+    el.append(list);
+  } else {
+    el.append(head, title, now, list);
+  }
   pane.appendChild(el);
 
   // accanto alla label, a sinistra (a destra se non c'è spazio), senza coprirla
