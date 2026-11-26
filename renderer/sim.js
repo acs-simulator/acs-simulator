@@ -40,6 +40,8 @@ export const CONFLICT_LOOKAHEAD_S = 300; // 5 minuti
 export const MAX_STRIKES = 3;
 export const STCA_S = 60;          // allarme automatico: perdita di separazione prevista entro 1 minuto
 
+const LANDING_RADIUS_NM = 8;       // un volo in atterraggio sparisce dal radar entro questa distanza dall'aeroporto,
+const LANDING_FT = 4000;           // se è già sotto questa quota o sull'ultimo tratto della rotta
 const MISSED_HANDOFF_GRACE_S = 30; // tolleranza fuori dal settore prima di considerare l'hand-off mancato
 const ENTRY_TOLERANCE_NM = 3;      // un volo è entrato nel settore solo da poco prima del punto d'ingresso pianificato
 const EXCURSION_TOLERANCE_NM = 3; // uscita pianificata ancora davanti di almeno così: l'uscita laterale è temporanea
@@ -2766,7 +2768,12 @@ export class Simulation {
 
     this.aircraft = this.aircraft.filter((ac) => {
       const dest = waypoint(ac.destination);
-      if (!OURS.has(ac.control) && dest && distance(ac, dest) < 8 && ac.altitude < 12000) return false;
+      // in atterraggio: vicino all'aeroporto e già basso, oppure sull'ultimo tratto verso la pista. Non basta
+      // essere vicini: diverse STAR cominciano o girano a meno di 8 NM dall'aeroporto (KATAR per Perugia,
+      // PAL per Catania, PISIP per Pescara) e il volo appena passato all'avvicinamento spariva subito
+      const nearDest = dest && distance(ac, dest) < LANDING_RADIUS_NM;
+      const onFinal = ac.route.every((id) => id === ac.destination);
+      if (!OURS.has(ac.control) && nearDest && (ac.altitude < LANDING_FT || (onFinal && ac.altitude < 12000))) return false;
       // volo dirottato per un'emergenza: l'ente successivo lo porta all'atterraggio, sparisce dal nostro radar
       if (!OURS.has(ac.control) && ac.emergency?.divert && dest && distance(ac, dest) < 10) return false;
       if (OURS.has(ac.control)) return inView(ac, 150);
