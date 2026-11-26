@@ -22,7 +22,7 @@ const TAG_LINE = 15;
 export const COLORS = {
   assumed: '#2EFF55',  // verde intenso: 14,6:1 sul fondo, 7,3:1 sul riquadro dell'hover, doppio del verde scuro
   offered: '#ff5bd8',
-  inbound: '#3CB45A',
+  inbound: '#00CC66',
   transferred: '#ffffff',
   notInContact: '#ffffff',
   vfr: '#e8d45a',
