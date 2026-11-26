@@ -296,14 +296,14 @@ export const LESSONS = [
       },
       {
         title: 'Il vettore velocità',
-        text: `Un <b>clic sul nominativo</b> accende lo "spadino": la linea che mostra dove sarà il volo
+        text: `Un <b>clic destro sul livello</b> attuale nel tag (su Mac clic con due dita) accende lo "spadino": la linea che mostra dove sarà il volo
           fra i minuti scelti con il cursore <b>Vettore</b> in basso. È il modo più rapido per vedere se due
           traiettorie si incrociano.`,
-        goal: 'Clic sul nominativo per accendere il vettore',
-        hint: 'Un clic proprio sul nominativo scritto nella prima riga del tag.',
+        goal: 'Clic destro sul livello per accendere il vettore',
+        hint: 'Clic destro (o con due dita) sul livello: le tre cifre all\'inizio della seconda riga del tag.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => !!c.mem.ac?.showVector,
-        success: 'Vettore acceso: si spegne con un altro clic sul nominativo.',
+        success: 'Vettore acceso: si spegne con un altro clic destro sul livello.',
       },
       {
         freeze: true,
@@ -400,7 +400,7 @@ export const LESSONS = [
     subtitle: 'L\'hand-off e il livello d\'uscita',
     learned: ['Uscita laterale: punto di coordinamento e livello richiesto',
       'Uscita verticale: portare il volo al livello di trasferimento e passarlo mentre ci arriva',
-      'Hand-off con la barra spaziatrice; cosa conta come errore'],
+      'Hand-off con un clic sul nominativo; cosa conta come errore'],
     background: 6,
     steps: [
       {
@@ -438,11 +438,13 @@ export const LESSONS = [
       },
       {
         title: 'Passalo',
-        text: `Seleziona il volo con un clic sul tag e premi la <b>barra spaziatrice</b>: è l'hand-off.<br>
+        text: `Un <b>clic sul nominativo</b> è l'hand-off (oppure seleziona il volo e premi la <b>barra
+          spaziatrice</b>). Finché il settore successivo non lo accetta il nominativo resta verde: un altro clic
+          lì e il volo torna tuo; dopo, serve il tasto <b>T</b>.<br>
           Si fa <b>poco prima</b> del confine, non dopo: un volo che esce dal settore ancora in contatto con te
           è un <b>errore</b>, come passarlo a un livello diverso da quello richiesto.`,
-        goal: 'Seleziona il volo e premi la barra spaziatrice',
-        hint: 'Prima un clic sul tag (la traccia si cerchia), poi spazio.',
+        goal: 'Clic sul nominativo del volo per passarlo',
+        hint: 'Un clic proprio sul nominativo scritto nella prima riga del tag.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => c.mem.ac?.control === 'transferred',
         success: 'Hand-off corretto: la label è bianca, col nominativo verde finché l\'ente successivo non accetta il volo; poi è tutta bianca.',
@@ -480,7 +482,7 @@ export const LESSONS = [
         text: `Quando mancano meno di <b>2000 ft</b> al livello di trasferimento il <b>livello nel tag diventa
           arancione</b>: è il momento dell'hand-off. Non aspettare che si livelli, e non aspettare il confine:
           qui si passa <b>in verticale</b>.`,
-        goal: 'Aspetta il livello arancione e premi la barra spaziatrice',
+        goal: 'Aspetta il livello arancione e clicca il nominativo',
         hint: 'Se non lo vedi ancora, accelera il tempo a 4x dal menu Simulazione.',
         focus: (c) => (alive(c.sim, c.mem.dsc) ? { tag: c.mem.dsc } : null),
         done: (c) => c.mem.dsc?.control === 'transferred',
@@ -895,7 +897,7 @@ export const LESSONS = [
           <b>Obiettivo</b>: dieci minuti di servizio con <b>8 hand-off corretti</b> e <b>nessun errore</b>.
           Qui gli errori non chiudono la partita, ma te li conto.<br><br>
           Promemoria: hand-on con un clic sul tag magenta, istruzioni cliccando i campi del tag, hand-off con
-          la <b>barra spaziatrice</b>, <b>H</b> apre il riepilogo dei comandi.`,
+          un clic sul nominativo (o la <b>barra spaziatrice</b>), <b>H</b> apre il riepilogo dei comandi.`,
       },
       {
         title: 'Turno in corso',

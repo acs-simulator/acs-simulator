@@ -1,7 +1,7 @@
 import { Simulation, MAX_STRIKES } from './sim.js';
 import {
   render, makeTransform, measureAt, radarView, resetView, panBy, zoomTo, ZOOM_RANGE, tagVisible, TAG_FL_RANGE,
-  rotateTag, freeTag, waypointShown, VECTOR_RANGE, deconflictTags, tagFieldAt, tagNameAt, speedFieldAt, cpaAt, labelAt, setHovered, labelBlock, MONO,
+  rotateTag, freeTag, waypointShown, VECTOR_RANGE, deconflictTags, tagFieldAt, tagNameAt, speedFieldAt, levelFieldAt, cpaAt, labelAt, setHovered, labelBlock, MONO,
 } from './radar.js';
 import {
   AREA_KINDS, areaBand, fmtClock, isActiveAt, currentOrNextWindow, PREACTIVE_S,
@@ -490,6 +490,7 @@ function startGame(sectorId, settings = sessionSettings(), lesson = null) {
     // resta fra i messaggi dei piloti, senza una notifica in più
     if (type === 'handoff' && !correct && !event.emergency) toast(`✗ ${ac.callsign} transferred at ${fmtFl(ac.clearedFL)}, not ${fmtFl(ac.requestedExitFL)} (${sim.strikes.length}/${MAX_STRIKES})`, 'error');
     if (type === 'missed' && !event.emergency) toast(`✗ ${ac.callsign} left the sector without hand-off (${sim.strikes.length}/${MAX_STRIKES})`, 'error');
+    if (type === 'recall') toast(`${ac.callsign} hand-off cancelled, back under your control`, 'ok');
     if (type === 'takeover') toast(`${ac.callsign} taken from ${event.from === 'inbound' ? ac.prevUnit : ac.nextUnit}, now under your control`, 'ok');
     if (type === 'stca') toast(`⚠ STCA ${event.a.callsign} – ${event.b.callsign}: separation lost in ${Math.max(0, Math.round(event.t))} s`, 'error');
     // perdita fra voli non nostri: si vede in rosso sul radar, ma non è un errore del giocatore
@@ -1002,11 +1003,24 @@ function endDrag(ev) {
       labelPanel.select(state.ac, false);
       return;
     }
-    // un clic sul nominativo accende o spegne lo spadino; altrove sulla label seleziona il volo (traccia
-    // cerchiata: è il volo che la barra spaziatrice passa e il tasto T prende). La traiettoria si apre a parte,
-    // con il clic destro sulla velocità.
-    if (tagNameAt(state.x, state.y) === state.ac) state.ac.showVector = !state.ac.showVector;
-    else labelPanel.select(state.ac, false);
+    // clic sul nominativo di un volo in contatto: hand-off; di nuovo sul nominativo, finché l'ente successivo non
+    // l'ha accettato (nominativo ancora verde), lo si riprende. Dopo l'accettazione serve il tasto T. Altrove sulla
+    // label (o sul nominativo degli altri voli) il clic seleziona il volo. Spadino e traiettoria si aprono con il
+    // clic destro, sul livello e sulla velocità.
+    const { ac } = state;
+    if (tagNameAt(state.x, state.y) === ac && !sim.gameOver) {
+      if (ac.control === 'assumed') {
+        labelPanel.select(ac, false);
+        labelPanel.handOffSelected();
+        return;
+      }
+      if (ac.control === 'transferred' && !ac.xferAccepted) {
+        if (sim.recallHandoff(ac)) labelPanel.select(ac, false);
+        else toast(`${ac.callsign} cannot be taken back: coordinate with ${ac.nextUnit ?? 'the next unit'}`, 'warn');
+        return;
+      }
+    }
+    labelPanel.select(ac, false);
   } catch (err) {
     console.error('Errore nell\'apertura dell\'etichetta', err);
   }
@@ -1536,9 +1550,12 @@ window.addEventListener('mouseup', (ev) => {
   panState = null;
   panEndedAt = performance.now();
   if (state.moved || !state.secondary) return;
-  // clic destro (o con due dita) sulla velocità di una label: traiettoria; altrove fa quello che fa Esc
+  // clic destro (o con due dita) sulla velocità di una label: traiettoria; sul livello attuale: spadino; altrove
+  // fa quello che fa Esc
   const routeAc = speedFieldAt(state.startX, state.startY);
+  const vectorAc = levelFieldAt(state.startX, state.startY);
   if (routeAc && !sim.gameOver) toggleRoute(routeAc);
+  else if (vectorAc) vectorAc.showVector = !vectorAc.showVector;
   else cancelAction();
 });
 

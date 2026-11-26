@@ -37,9 +37,10 @@ const HALO = 'rgba(5, 11, 18, 0.85)';
 
 // Label integrata. I campi dipendono da quello che fa il volo (livellato, oppure in salita o in discesa)
 // e dal passaggio del mouse; tre righe da livellato, quattro in salita o discesa. fullLabel: voli di nostra
-// competenza, per cui il livello autorizzato è il nostro.
+// competenza, per cui il livello autorizzato è il nostro, compresi quelli appena passati che l'ente successivo non ha
+// ancora accettato: la label resta uguale, così il nominativo non si sposta e un altro clic lo riprende.
 export function fullLabel(ac) {
-  return ac.control === 'assumed' || ac.control === 'offered';
+  return ac.control === 'assumed' || ac.control === 'offered' || (ac.control === 'transferred' && !ac.xferAccepted);
 }
 
 // in salita o in discesa: si muove in verticale, oppure ha ancora da raggiungere il livello autorizzato
@@ -82,7 +83,7 @@ export function waypointShown(wp) {
 // sistemi reali, dove il filtro in quota riguarda solo il traffico non di competenza.
 export function tagVisible(ac) {
   if (isHovered(ac)) return true;
-  if (ac.control === 'assumed' || ac.control === 'offered' || ac.selected || ac.stca || ac.conflict || ac.apw) return true;
+  if (fullLabel(ac) || ac.selected || ac.stca || ac.conflict || ac.apw) return true;
   const fl = ac.flightLevel;
   const { tagMinFL: lo, tagMaxFL: hi } = radarView;
   return (lo <= TAG_FL_RANGE[0] || fl >= lo) && (hi >= TAG_FL_RANGE[1] || fl <= hi);
@@ -833,8 +834,8 @@ const pad = (fl) => Math.round(fl).toString().padStart(3, '0');
 // posizioni, una ogni HISTORY_S secondi: a intervalli fissi di tempo i punti di un aereo veloce sono più
 // distanziati e la scia più lunga. I punti più vecchi si rimpiccioliscono e svaniscono; se sono molto
 // ravvicinati (aereo lento) diventano più piccoli, così restano distinti. Il vettore velocità (posizione prevista
-// fra radarView.vectorMin minuti con prua e velocità attuali) si accende e si spegne con un clic sul
-// nominativo nella label.
+// fra radarView.vectorMin minuti con prua e velocità attuali) si accende e si spegne con il clic destro sul
+// livello attuale nella label.
 const SYMBOL_R = 3.3;
 const HISTORY_DOTS = 6;
 
@@ -1119,8 +1120,10 @@ function drawAircraft(ctx, t, ac, now) {
       if (!hovered) ctx.strokeText(seg.text, x, y);
       ctx.fillStyle = seg.color;
       ctx.fillText(seg.text, x, y);
-      // un clic sul nominativo accende o spegne lo spadino
+      // un clic sul nominativo: hand-off, oppure ripresa di un volo passato non ancora accettato
       if (seg.key === 'name') tagNames.push({ ac, x0: x - 3, x1: x + seg.w + 3, y0: y - 13, y1: y + 4 });
+      // clic destro sul livello attuale (su Mac clic con due dita): spadino, per ogni volo
+      if (seg.lev && !ac.vfr) tagLevels.push({ ac, x0: x - 3, x1: x + Math.max(seg.w, 3 * cwOf(ctx)) + 3, y0: y - 12, y1: y + 4 });
       // clic destro sulla velocità (su Mac clic con due dita): apre o chiude la traiettoria, per ogni volo
       if (seg.key === 'speed' && !ac.vfr) tagSpeeds.push({ ac, x0: x - 3, x1: x + Math.max(seg.w, 3 * cwOf(ctx)) + 3, y0: y - 12, y1: y + 4 });
       // prua, prossimo punto, rateo, livello autorizzato e velocità si cliccano per cambiarli (voli in contatto)
@@ -1301,7 +1304,8 @@ function labelRows(ctx, ac, color, hovered) {
   const toXfl = ac.requestedExitFL !== null && ac.requestedExitFL !== undefined ? ac.requestedExitFL * 100 - ac.altitude : null;
   const nearXfl = ac.control === 'assumed' && ac.verticalExit && toXfl !== null && Math.abs(toXfl) <= XFL_NEAR_FT
     && (Math.abs(toXfl) < 100 || Math.sign(toXfl) === Math.sign(ac.verticalFpm ?? 0));
-  const levRow = [field(pad3(ac.flightLevel), 0, nearXfl ? COLORS.warning : color)];
+  // livello attuale: il clic destro qui accende o spegne lo spadino
+  const levRow = [{ ...field(pad3(ac.flightLevel), 0, nearXfl ? COLORS.warning : color), lev: true }];
   if (evolving) levRow.push(field(up ? '↑' : '↓', cArrow, color));
   // traffico non in contatto senza il mouse sopra: solo nominativo e livello
   if (!fullLabel(ac) && !hovered) {
@@ -1377,7 +1381,7 @@ export function labelAt(x, y) {
   return null;
 }
 
-// Nominativi scritti sui tag: un clic accende o spegne lo spadino.
+// Nominativi scritti sui tag: un clic fa l'hand-off (o riprende un volo passato non ancora accettato).
 let tagNames = [];
 
 export function tagNameAt(x, y) {
@@ -1391,6 +1395,16 @@ export function tagNameAt(x, y) {
 // Livello e velocità scritti sui tag dei voli in contatto: un clic apre il menu per autorizzarne un altro.
 let tagFields = [];
 let tagSpeeds = [];
+let tagLevels = [];
+
+// Volo il cui livello attuale è scritto sotto il punto (px CSS): il clic destro lì accende lo spadino.
+export function levelFieldAt(x, y) {
+  for (let i = tagLevels.length - 1; i >= 0; i--) {
+    const f = tagLevels[i];
+    if (x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1) return f.ac;
+  }
+  return null;
+}
 
 // Volo la cui velocità è scritta sotto il punto (px CSS): il clic destro lì apre la traiettoria.
 export function speedFieldAt(x, y) {
@@ -1444,6 +1458,7 @@ export function render(ctx, canvas, sim, {
   tagFields = [];
   tagNames = [];
   tagSpeeds = [];
+  tagLevels = [];
   tagBlocks = [];
   trackPoints = [];
   // i VFR sotto a tutto, con la stessa label (marca, quota e velocità) e lo stesso filtro dei livelli
