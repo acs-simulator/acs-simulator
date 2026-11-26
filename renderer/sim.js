@@ -45,6 +45,10 @@ const ENTRY_TOLERANCE_NM = 3;      // un volo è entrato nel settore solo da poc
 const EXCURSION_TOLERANCE_NM = 3; // uscita pianificata ancora davanti di almeno così: l'uscita laterale è temporanea
 const EXIT_POINT_TOLERANCE_NM = 8; // scostamento laterale massimo dal punto d'uscita quando si lascia il settore
 const XFL_LEVEL_WARN_S = 30;       // uscita dall'alto o dal basso: volo livellato all'XFL e ancora in contatto
+// Livello arancione nella label (è il momento dell'hand-off): a meno di 2000 ft dal livello d'uscita, andandoci
+// incontro o già arrivato; per le uscite su un punto (COP o inizio della STAR) anche a meno di 2 minuti da lì.
+export const XFL_NEAR_FT = 2000;
+const HANDOFF_CUE_S = 120;
 const TRANSFER_BELOW_FT = 2000;    // l'ente inferiore porta subito il volo almeno così sotto il nostro limite
 const TAKEOVER_S = 20;             // dopo l'hand-off l'ente successivo comincia a dare le sue istruzioni
 // Il controllore dell'ente successivo accetta il volo (traccia tutta bianca) quando il pilota lo chiama: di
@@ -385,6 +389,7 @@ export class Aircraft {
     this.exitChecked = false;
     this.exitCoordinated = false; // diretto coordinato oltre il punto d'uscita: l'uscita non si controlla più
     this.levelledAtXflSince = null;
+    this.handoffCue = false;      // è il momento dell'hand-off (livello arancione), vedi Simulation._handoffCue
     this.xflWarned = false;
   }
 
@@ -1686,6 +1691,32 @@ export class Simulation {
     return null;
   }
 
+  // È il momento dell'hand-off (livello arancione nella label)? Uscita dall'alto o dal basso: a meno di
+  // XFL_NEAR_FT dal livello d'uscita, andandoci incontro o già arrivato. Uscita su un punto (COP laterale o
+  // inizio della STAR, dove il volo passa all'avvicinamento): vicino al livello d'uscita allo stesso modo e a
+  // meno di HANDOFF_CUE_S dal punto, lungo la rotta o, se è su prua, in linea d'aria. In più, per ogni uscita, il
+  // volo su prua (deviazione meteo, vettoramento) che sta per lasciare il settore lateralmente entro HANDOFF_CUE_S
+  // in un punto diverso da quello pianificato: va passato comunque prima del confine.
+  _handoffCue(ac) {
+    if (ac.control !== 'assumed' || ac.requestedExitFL == null) return false;
+    if (ac.mode === 'heading' && insideLateral(ac)) {
+      const rad = (ac.heading * Math.PI) / 180;
+      for (let t = 30; t <= HANDOFF_CUE_S; t += 30) {
+        const nm = (ac.speed * t) / 3600;
+        if (!insideLateral({ x: ac.x + Math.sin(rad) * nm, y: ac.y - Math.cos(rad) * nm })) return true;
+      }
+    }
+    const toXfl = ac.requestedExitFL * 100 - ac.altitude;
+    const nearLevel = Math.abs(toXfl) <= XFL_NEAR_FT
+      && (Math.abs(toXfl) < 100 || Math.sign(toXfl) === Math.sign(ac.verticalFpm ?? 0));
+    if (!nearLevel) return false;
+    if (ac.verticalExit) return true;
+    const fix = ac.exitFix ? waypoint(ac.exitFix) : null;
+    if (!fix) return false;
+    const t = ac.mode === 'route' ? this._timeToExit(ac) : (distance(ac, fix) / Math.max(ac.speed, 1)) * 3600;
+    return t <= HANDOFF_CUE_S;
+  }
+
   // Secondi prima che il volo lasci il settore lungo la rotta (fino al punto d'uscita). Su prua: sconosciuto.
   _timeToExit(ac) {
     const fix = ac.exitFix ?? ac.routeLimitFix;
@@ -2244,6 +2275,7 @@ export class Simulation {
       } else {
         ac.levelledAtXflSince = null;
       }
+      ac.handoffCue = this._handoffCue(ac);
     } else if (ac.control === 'transferred' && ac.emergency?.radio === false) {
       // avaria radio passata all'ente successivo: nessuno può istruirlo, segue la regola del 7600
       radioFailureStep(ac, ac.emergency.holdLeftS, profileFt, profilePhase(ac.profile, ac.profileS));

@@ -1147,7 +1147,6 @@ function drawAircraft(ctx, t, ac, now) {
 const LABEL_FONT = `13px ${MONO}`;
 const NAME_FONT = `bold 13px ${MONO}`;
 const DOWNLINK = '#45c8ee';                   // dati letti da bordo (ciano)
-const XFL_NEAR_FT = 2000;                     // livello arancione a meno di 2000 ft dal livello di passaggio
 const MISMATCH = '#ff9f40';                   // livello selezionato a bordo diverso dall'autorizzato
 const XFL_COLOR = '#d68cff';                  // livello d'uscita
 const XFL_EMPTY = '#e8eef0';
@@ -1308,11 +1307,10 @@ function labelRows(ctx, ac, color, hovered) {
   const vfpm = ac.verticalFpm ?? 0;
   const diff = ac.assignedAltitude - ac.altitude;
   const up = Math.abs(vfpm) >= 100 ? vfpm > 0 : diff > 0;
-  // livello di volo arancione quando si avvicina al livello di passaggio al settore superiore o inferiore
-  // (entro XFL_NEAR_FT, andandoci incontro o già arrivato): è il momento dell'hand-off
-  const toXfl = ac.requestedExitFL !== null && ac.requestedExitFL !== undefined ? ac.requestedExitFL * 100 - ac.altitude : null;
-  const nearXfl = ac.control === 'assumed' && ac.verticalExit && toXfl !== null && Math.abs(toXfl) <= XFL_NEAR_FT
-    && (Math.abs(toXfl) < 100 || Math.sign(toXfl) === Math.sign(ac.verticalFpm ?? 0));
+  // livello di volo arancione quando è il momento dell'hand-off (Simulation._handoffCue): vicino al livello di
+  // passaggio al settore superiore o inferiore, oppure vicino al livello d'uscita a meno di 2 minuti dal COP o
+  // dall'inizio della STAR
+  const nearXfl = ac.control === 'assumed' && !!ac.handoffCue;
   // livello attuale: il clic destro qui accende o spegne lo spadino
   const levRow = [{ ...field(pad3(ac.flightLevel), 0, nearXfl ? COLORS.warning : color), lev: true }];
   if (evolving) levRow.push(field(up ? '↑' : '↓', cArrow, color));
