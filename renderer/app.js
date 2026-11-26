@@ -799,7 +799,9 @@ const ours = (ac) => ac.control === 'assumed' || ac.control === 'offered';
 function findTrackAt(t, x, y) {
   let closest = null;
   let closestDist = SYMBOL_HIT_PX;
-  for (const ac of sim.aircraft) {
+  // i VFR solo se non c'è vicino nessuna traccia IFR
+  for (const ac of [...sim.aircraft, ...sim.vfr]) {
+    if (ac.vfr && closest) break;
     if (closest && ours(closest) && !ours(ac)) continue;
     const p = t.toPx(ac.x, ac.y);
     const d = Math.hypot(p.px - x, p.py - y);
@@ -817,8 +819,12 @@ function findTagAt(t, x, y) {
   return labelAt(x, y);
 }
 
+// Volo IFR (label o traccia) per gli strumenti CPA e R&B: i VFR non si misurano.
 function findAircraftAt(t, x, y) {
-  return findTagAt(t, x, y) ?? findTrackAt(t, x, y);
+  const tag = findTagAt(t, x, y);
+  if (tag && !tag.vfr) return tag;
+  const track = findTrackAt(t, x, y);
+  return track && !track.vfr ? track : null;
 }
 
 function findWaypointAt(t, x, y) {
@@ -985,6 +991,8 @@ function endDrag(ev) {
     rotateTag(state.ac);
     return;
   }
+  // un VFR non si seleziona: la sua label si ruota o si trascina e basta
+  if (state.ac.vfr) return;
   try {
     // clic su un traffico magenta: hand-on
     if (state.ac.control === 'offered' && !sim.gameOver) sim.handOn(state.ac);

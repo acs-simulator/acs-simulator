@@ -816,6 +816,7 @@ export function deconflictTags(canvas, aircraftList) {
 }
 
 function aircraftColor(ac) {
+  if (ac.vfr) return COLORS.vfr;
   if (ac.conflict || ac.stca || ac.apw) return COLORS.conflict;
   // emergenza in rosso, urgenza (PAN PAN) e avaria radio in ambra: hanno priorità ma non sono un'emergenza
   if (ac.emergency) return ac.emergency.urgency === 'MAYDAY' ? COLORS.conflict : COLORS.warning;
@@ -827,34 +828,6 @@ function aircraftColor(ac) {
 }
 
 const pad = (fl) => Math.round(fl).toString().padStart(3, '0');
-
-// Volo VFR (squawk 7000): traccia gialla e, accanto, il nominativo (la marca, fittizia), la quota Mode C (centinaia
-// di piedi) e la velocità al suolo; nient'altro, né linea guida. Le tre righe si vedono sempre, anche con il filtro
-// dei livelli delle etichette (i VFR volano tutti sotto i settori alti).
-const VFR_FONT = `12px ${MONO}`;
-const VFR_NAME_FONT = `bold 12px ${MONO}`;
-function drawVfr(ctx, t, f) {
-  const color = COLORS.vfr;
-  drawTrack(ctx, t, f, color, 0.85);
-  const { px, py } = t.toPx(f.x, f.y);
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = HALO;
-  ctx.fillStyle = color;
-  ctx.globalAlpha = 0.9;
-  const x = px + 8;
-  const rows = [
-    [f.callsign ?? '', py - 10, VFR_NAME_FONT],
-    [pad(f.altitude / 100), py + 3, VFR_FONT],
-    [pad(f.speed), py + 16, VFR_FONT],
-  ];
-  for (const [text, y, font] of rows) {
-    ctx.font = font;
-    ctx.strokeText(text, x, y);
-    ctx.fillText(text, x, y);
-  }
-  ctx.globalAlpha = 1;
-}
 
 // Traccia radar come su uno schermo di controllo: simbolo di posizione (punto pieno) e scia delle ultime
 // posizioni, una ogni HISTORY_S secondi: a intervalli fissi di tempo i punti di un aereo veloce sono più
@@ -1287,6 +1260,14 @@ function labelRows(ctx, ac, color, hovered) {
     if (v !== null && v !== undefined) row.push(field(v, dx, c, key));
     else if (hovered) row.push(field(empty, dx, emptyColor, key));
   };
+  // volo VFR: marca, quota Mode C e velocità al suolo, nient'altro (nessun campo cliccabile)
+  if (ac.vfr) {
+    return [
+      [field(ac.callsign ?? '', 0, color, null, NAME_FONT)],
+      [field(pad3(ac.flightLevel), 0, color)],
+      [field(pad3(ac.speed), 0, color)],
+    ];
+  }
   const evolving = isEvolving(ac);
 
   // il nominativo resta nel colore della label anche da selezionato: la selezione si vede dal cerchio sulla traccia.
@@ -1450,8 +1431,8 @@ export function render(ctx, canvas, sim, {
   tagNames = [];
   tagBlocks = [];
   trackPoints = [];
-  // i VFR sotto a tutto: solo traccia, quota e velocità
-  for (const f of sim.vfr ?? []) drawVfr(ctx, t, f);
+  // i VFR sotto a tutto, con la stessa label (marca, quota e velocità) e lo stesso filtro dei livelli
+  for (const f of sim.vfr ?? []) drawAircraft(ctx, t, f, now);
   for (const ac of order) drawAircraft(ctx, t, ac, now);
   measureBoxes = [];
   measures.forEach((m, i) => drawMeasure(ctx, t, m.a, m.b, i));

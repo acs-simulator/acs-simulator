@@ -164,8 +164,14 @@ export class VfrTraffic {
     const cruise = this._cruise(type, track);
     const { lat } = airspace.projection.toLatLon(plan.start.x, plan.start.y);
     const f = {
-      id: ++this._id,
+      id: `vfr-${++this._id}`,   // distinto dagli id dei voli IFR (hover, posizione della label)
       vfr: true,
+      control: 'vfr',
+      // label come quella degli altri voli: posizione, rotazione con un clic sulla traccia, trascinamento
+      tagOffset: { x: 30, y: -30 },
+      tagAngle: 45,
+      selected: false,
+      showVector: false,
       callsign: this._registration(type, lat),
       type,
       x: plan.start.x,
@@ -173,6 +179,7 @@ export class VfrTraffic {
       heading: track,
       speed: Math.round(this._between(...type.gs)),
       altitude: 1000,
+      flightLevel: 10,
       cruise,
       points: plan.points,
       trail: [],
@@ -185,6 +192,7 @@ export class VfrTraffic {
       f.x += (to.x - f.x) * k;
       f.y += (to.y - f.y) * k;
       f.altitude = cruise;
+      f.flightLevel = Math.round(cruise / 100);
     }
     if (!inView(f, SPAWN_MARGIN_NM)) return null;
     const back = (f.speed / 3600) * TRAIL_S;
@@ -243,6 +251,8 @@ export class VfrTraffic {
       f._wobble = Math.max(-80, Math.min(80, f._wobble + (this.rnd() - 0.5) * 12 * Math.sqrt(dt)));
       f.altitude = target + f._wobble;
     }
+
+    f.flightLevel = Math.round(f.altitude / 100);
 
     const nm = (f.speed / 3600) * dt;
     const rad = (f.heading * Math.PI) / 180;
