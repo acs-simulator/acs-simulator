@@ -17,13 +17,15 @@ const TAG_LINE = 15;
 
 // Colori per stato di controllo, come in sala ACC: verde scuro il volo che entrerà nel settore ma è ancora
 // dell'ente precedente, magenta quando ce lo passano, verde in contatto; dopo il nostro hand-off bianco con il solo
-// nominativo verde finché l'ente successivo non lo accetta, poi tutto bianco. Giallo il traffico di altri.
+// nominativo verde finché l'ente successivo non lo accetta, poi tutto bianco. Bianco anche il traffico di altri
+// settori; giallo solo il traffico VFR (squawk 7000), di cui si leggono soltanto quota e velocità.
 export const COLORS = {
   assumed: '#7CFC9A',
   offered: '#ff5bd8',
-  inbound: '#006400',
+  inbound: '#3CB45A',
   transferred: '#ffffff',
-  notInContact: '#e8d45a',
+  notInContact: '#ffffff',
+  vfr: '#e8d45a',
   conflict: '#ff4d4d',
   warning: '#ffb84d',
   selected: '#ffffff',
@@ -826,6 +828,29 @@ function aircraftColor(ac) {
 
 const pad = (fl) => Math.round(fl).toString().padStart(3, '0');
 
+// Volo VFR (squawk 7000): traccia gialla e, accanto, solo la quota Mode C (centinaia di piedi) e la velocità al
+// suolo; niente nominativo né linea guida, come per un aereo non identificato che vola a vista. Le due righe si
+// vedono sempre, anche con il filtro dei livelli delle etichette (i VFR volano tutti sotto i settori alti).
+const VFR_FONT = `12px ${MONO}`;
+function drawVfr(ctx, t, f) {
+  const color = COLORS.vfr;
+  drawTrack(ctx, t, f, color, 0.85);
+  const fl = Math.round(f.altitude / 100);
+  const { px, py } = t.toPx(f.x, f.y);
+  ctx.font = VFR_FONT;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = HALO;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.9;
+  const x = px + 8;
+  [[pad(fl), py - 4], [pad(f.speed), py + 9]].forEach(([text, y]) => {
+    ctx.strokeText(text, x, y);
+    ctx.fillText(text, x, y);
+  });
+  ctx.globalAlpha = 1;
+}
+
 // Traccia radar come su uno schermo di controllo: simbolo di posizione (punto pieno) e scia delle ultime
 // posizioni, una ogni HISTORY_S secondi: a intervalli fissi di tempo i punti di un aereo veloce sono più
 // distanziati e la scia più lunga. I punti più vecchi si rimpiccioliscono e svaniscono; se sono molto
@@ -1134,7 +1159,7 @@ const XFL_NEAR_FT = 2000;                     // livello arancione a meno di 200
 const MISMATCH = '#ff9f40';                   // livello selezionato a bordo diverso dall'autorizzato
 const XFL_COLOR = '#d68cff';                  // livello d'uscita
 const XFL_EMPTY = '#e8eef0';
-const HOVER_BG = 'rgba(92, 100, 112, 0.9)';
+const HOVER_BG = 'rgba(66, 74, 86, 0.9)';  // grigio scuro quanto basta perché i due verdi, il ciano e il viola si leggano
 const HOVER_BORDER = 'rgba(210, 218, 228, 0.7)';
 
 function cwOf(ctx) {
@@ -1420,6 +1445,8 @@ export function render(ctx, canvas, sim, {
   tagNames = [];
   tagBlocks = [];
   trackPoints = [];
+  // i VFR sotto a tutto: solo traccia, quota e velocità
+  for (const f of sim.vfr ?? []) drawVfr(ctx, t, f);
   for (const ac of order) drawAircraft(ctx, t, ac, now);
   measureBoxes = [];
   measures.forEach((m, i) => drawMeasure(ctx, t, m.a, m.b, i));

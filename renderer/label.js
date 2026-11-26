@@ -131,7 +131,7 @@ export class LabelPanel {
 
   // Hand-off del volo selezionato: dal pulsante HAND-OFF o dalla barra spaziatrice sul radar. Restituisce true
   // se il volo è stato passato (anche al livello sbagliato, che conta come errore).
-  // tasto T: presa coordinata del volo giallo selezionato (o hand-on di quello offerto)
+  // tasto T: presa coordinata del volo non in contatto selezionato (o hand-on di quello offerto)
   takeOverSelected() {
     if (!this.aircraft || this.sim?.gameOver || !this.sim.takeOver(this.aircraft)) return false;
     this._afterTransferAction();
