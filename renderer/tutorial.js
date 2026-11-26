@@ -52,7 +52,7 @@ export function spawnFlight(sim, { offerIn = 45, want = null, tries = 400, assum
   return null;
 }
 
-// Traffico di contorno (giallo) attorno al settore: serve a non far sembrare il radar vuoto.
+// Traffico di contorno (bianco) attorno al settore: serve a non far sembrare il radar vuoto.
 export function fillBackground(sim, n) {
   for (let i = 0, placed = 0; i < n * 4 && placed < n; i++) {
     if (sim.spawnOther(true)) placed++;
@@ -163,9 +163,9 @@ export const LESSONS = [
         text: `Ogni aereo è un <b>punto</b> con dietro la <b>scia</b> delle posizioni precedenti, una ogni
           12 secondi: più i puntini sono distanziati, più il volo è veloce.<br><br>
           Accanto c'è il <b>tag</b> (l'etichetta) collegato da una linea guida. Questi voli sono
-          <b class="c-yellow">gialli</b>: non sono tuoi, li sta controllando qualcun altro.`,
+          <b class="c-white">bianchi</b>: non sono tuoi, li sta controllando qualcun altro.`,
         goal: 'Passa il mouse sopra una traccia o sopra un tag',
-        hint: 'Avvicina il cursore a uno dei puntini gialli: il tag diventa grigio e si apre con tutti i campi.',
+        hint: 'Avvicina il cursore a uno dei puntini bianchi: il tag diventa grigio e si apre con tutti i campi.',
         focus: (c) => {
           const ac = c.sim.aircraft.find((a) => a.control === 'other' && tagVisible(a));
           return ac ? { ac } : null;
@@ -191,7 +191,7 @@ export const LESSONS = [
   {
     id: 'handon',
     title: 'Prendere i voli in carico',
-    subtitle: 'Giallo, verde scuro, magenta, verde, bianco',
+    subtitle: 'Bianco, verde scuro, magenta, verde, giallo',
     learned: ['I colori del traffico e cosa significano',
       'Fare l\'hand-on con un clic sul tag',
       'Leggere il piano di volo e la rotta di un volo selezionato'],
@@ -200,14 +200,16 @@ export const LESSONS = [
       {
         freeze: true,
         title: 'I colori delle tracce',
-        text: `<b class="c-yellow">Giallo</b>: non è tuo. Lo vedi perché ti passa vicino, ma lo controlla
+        text: `<b class="c-white">Bianco</b>: non è tuo. Lo vedi perché ti passa vicino, ma lo controlla
           un altro settore.<br>
           <b class="c-pending">Verde scuro</b>: entrerà nel tuo settore, ma è ancora dell'ente precedente.<br>
           <b class="c-magenta">Magenta</b>: l'ente precedente te lo ha <b>passato</b> e aspetta che tu lo
           prenda in carico.<br>
           <b class="c-green">Verde</b>: è <b>in contatto</b> con te. Solo su questi puoi dare istruzioni.<br>
-          <b class="c-white">Bianco</b>: l'hai passato all'ente successivo. Finché quello non lo accetta il
-          nominativo resta verde; poi diventa tutto bianco.`,
+          Quando lo passi all'ente successivo torna <b class="c-white">bianco</b>, ma il nominativo resta
+          verde finché quello non lo accetta.<br>
+          <b class="c-yellow">Giallo</b>: un volo <b>VFR</b> (aviazione generale a vista, squawk 7000), basso e
+          lento: ne leggi solo quota e velocità. Non è mai tuo.`,
       },
       {
         title: 'Un volo per te',
@@ -1043,7 +1045,7 @@ export class Tutorial {
           this.next();
         }
       } else if (ev.key === 'm' || ev.key === 'M') {
-        // M riduce il riquadro (T è la presa di un volo giallo)
+        // M riduce il riquadro (T è la presa di un volo non in contatto)
         this.toggleCollapsed();
       }
     });

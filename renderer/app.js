@@ -792,7 +792,7 @@ function cssPoint(ev) {
 const SYMBOL_HIT_PX = 12;
 
 // Aereo la cui traccia (simbolo di posizione) è vicina al punto, senza considerare le etichette. Le tracce di
-// competenza (verdi e magenta) hanno la precedenza: una gialla vicina viene scelta solo se nessuna di quelle è
+// competenza (verdi e magenta) hanno la precedenza: una bianca vicina viene scelta solo se nessuna di quelle è
 // a portata di clic.
 const ours = (ac) => ac.control === 'assumed' || ac.control === 'offered';
 
@@ -939,7 +939,7 @@ canvas.addEventListener('mousedown', (ev) => {
     return;
   }
 
-  // la label ha la precedenza sulle tracce degli altri aerei che copre (anche quelle gialle); solo sulla traccia
+  // la label ha la precedenza sulle tracce degli altri aerei che copre (anche quelle bianche); solo sulla traccia
   // del suo stesso volo vale la traccia (un clic la ruota)
   const label = findTagAt(t, x, y);
   const near = findTrackAt(t, x, y);
@@ -1116,7 +1116,7 @@ window.addEventListener('keydown', (ev) => {
     if (!labelPanel.handOffSelected()) toast('Select a flight under your control first', 'warn');
     return;
   }
-  // T: presa del volo giallo selezionato (passato, ancora con l'ente precedente o di un altro settore)
+  // T: presa del volo non in contatto selezionato (passato, ancora con l'ente precedente o di un altro settore)
   if ((ev.key === 't' || ev.key === 'T') && !typing && sim && !sim.gameOver && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
     const ac = labelPanel.aircraft;
     if (!ac) toast('Select a yellow flight first, then press T', 'warn');

@@ -1,5 +1,6 @@
 import { waypoint, insideVolume, insideLateral, inView, airspace, distanceFromSector, unitAt } from './airspace.js';
 import { generateCallsign } from './callsigns.js';
+import { VfrTraffic } from './vfr.js';
 import { DIFFICULTY, sectorDemand } from './sectors.js';
 import { normalizeDeg, angleDiff, bearing, distance, distanceToSegment } from './geo.js';
 import { profileAltitude, profilePhase, profileTime } from './flows.js';
@@ -264,11 +265,11 @@ export function predictConflicts(aircraftList, horizon = CONFLICT_LOOKAHEAD_S) {
 }
 
 // Stati di controllo:
-//   other       non di nostra competenza (giallo)
-//   inbound     in arrivo, ancora con l'ente precedente (giallo)
+//   other       non di nostra competenza (bianco)
+//   inbound     in arrivo, ancora con l'ente precedente (verde scuro)
 //   offered     passato a noi dall'ente precedente, in attesa di hand-on (magenta)
 //   assumed     in contatto con noi
-//   transferred hand-off effettuato, non più in contatto (giallo)
+//   transferred hand-off effettuato, non più in contatto (bianco, nominativo verde finché non è accettato)
 // rateo assegnato: in salita fino a 1,3 volte quello normale del tipo (il pilota riduce la velocità), in discesa
 // fino a 1,5 volte (aerofreni)
 const CLIMB_RATE_MAX = 1.3;
@@ -876,6 +877,8 @@ export class Simulation {
     // modalita' guidata (tutorial): il traffico non viene generato da solo, lo decide la lezione.
     // Resta tutto il resto: profili, coordinamento, allarmi, zone e meteo.
     this.scripted = !!settings.scripted;
+    // traffico VFR di contorno (giallo, solo quota e velocità): non entra nella separazione né nel carico
+    this._vfr = new VfrTraffic();
 
     this.strikes = [];       // errori di coordinamento: {callsign, reason}
     this.stats = { handedOff: 0, assumed: 0 };
@@ -1282,7 +1285,13 @@ export class Simulation {
   // alcuni già in contatto (verdi), gli altri ci vengono offerti a poca distanza l'uno dall'altro entro
   // difficulty.fillS secondi. Da lì le offerte seguono la domanda normale: gli altri voli compaiono al bordo del radar o
   // decollano man mano.
+  // Voli VFR in vista: oggetti semplici {x, y, heading, speed, altitude, trail}, solo da disegnare.
+  get vfr() {
+    return this._vfr.flights;
+  }
+
   seedInitialTraffic() {
+    if (!this.scripted) this._vfr.seed(this.clockS);
     const { load, fillS, evolvingBias } = this.difficulty;
     const others = Math.round(this.maxOther * SEED_OTHER_SHARE);
     for (let i = 0, placed = 0; i < others * 4 && placed < others; i++) {
@@ -1307,7 +1316,7 @@ export class Simulation {
         const near = plan && advancePlan(plan, offerIn);
         const ac = near && this._trySpawnOurs(near);
         if (!ac) continue;
-        // un passaggio breve resta giallo: il controllore non deve trovarsi da passare subito un volo mai visto
+        // un passaggio breve resta di altri: il controllore non deve trovarsi da passare subito un volo mai visto
         if (i < assumed && this._timeToExit(ac) >= SEED_ASSUMED_MIN_STAY_S) {
           ac.control = 'offered';
           ac.offeredAt = this.simTime;
@@ -1423,7 +1432,7 @@ export class Simulation {
     return true;
   }
 
-  // Presa di un volo giallo (tasto T), coordinata a voce con chi lo ha: un volo che abbiamo appena passato,
+  // Presa di un volo non in contatto (tasto T), coordinata a voce con chi lo ha: un volo che abbiamo appena passato,
   // uno ancora con l'ente precedente o uno di un altro settore. Diventa nostro a tutti gli effetti, separazione
   // compresa, e va ripassato. Un volo preso fuori dal settore non conta come uscito senza hand-off: lo diventa
   // solo se entra e poi esce. Il traffico che non era pianificato attraverso il settore non ha un livello
@@ -2662,6 +2671,7 @@ export class Simulation {
       this._updateEmergency(ac, dt);
     }
     this._emergencyTick();
+    if (!this.scripted) this._vfr.tick(dt, this.clockS);
 
     this._resolveOthersTick(dt);
 
