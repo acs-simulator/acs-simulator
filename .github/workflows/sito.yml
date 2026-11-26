@@ -25,11 +25,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pubblica:
+  # Due job, come raccomanda GitHub: la pubblicazione parte solo quando il job che costruisce è finito e l'archivio
+  # del sito è registrato. Nello stesso job deploy-pages partiva meno di un secondo dopo il caricamento e a volte non
+  # trovava ancora l'archivio ("No artifacts named github-pages"), e il sito restava indietro finché qualcuno non
+  # rilanciava il workflow.
+  costruisci:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,5 +41,13 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+
+  pubblica:
+    needs: costruisci
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - id: deploy
         uses: actions/deploy-pages@v4
