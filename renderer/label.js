@@ -152,8 +152,8 @@ export class LabelPanel {
 
   // --- selezione -----------------------------------------------------------
 
-  // Un clic sul tag seleziona il volo (traccia cerchiata e rotta sul radar); il pannello con le istruzioni
-  // si apre solo con il doppio clic sul nominativo, cioè con openPanel.
+  // Un clic sul tag seleziona il volo (traccia cerchiata; la traiettoria si apre a parte, con il clic destro sulla
+  // velocità); il pannello con le istruzioni si apre solo con openPanel.
   select(aircraft, openPanel = true) {
     if (aircraft === this.aircraft) {
       if (openPanel) this.el.panel.classList.remove('hidden');

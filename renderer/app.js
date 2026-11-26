@@ -1,7 +1,7 @@
 import { Simulation, MAX_STRIKES } from './sim.js';
 import {
   render, makeTransform, measureAt, radarView, resetView, panBy, zoomTo, ZOOM_RANGE, tagVisible, TAG_FL_RANGE,
-  rotateTag, freeTag, waypointShown, VECTOR_RANGE, deconflictTags, tagFieldAt, tagNameAt, cpaAt, labelAt, setHovered, labelBlock, MONO,
+  rotateTag, freeTag, waypointShown, VECTOR_RANGE, deconflictTags, tagFieldAt, tagNameAt, speedFieldAt, levelFieldAt, cpaAt, labelAt, setHovered, labelBlock, MONO,
 } from './radar.js';
 import {
   AREA_KINDS, areaBand, fmtClock, isActiveAt, currentOrNextWindow, PREACTIVE_S,
@@ -490,6 +490,7 @@ function startGame(sectorId, settings = sessionSettings(), lesson = null) {
     // resta fra i messaggi dei piloti, senza una notifica in più
     if (type === 'handoff' && !correct && !event.emergency) toast(`✗ ${ac.callsign} transferred at ${fmtFl(ac.clearedFL)}, not ${fmtFl(ac.requestedExitFL)} (${sim.strikes.length}/${MAX_STRIKES})`, 'error');
     if (type === 'missed' && !event.emergency) toast(`✗ ${ac.callsign} left the sector without hand-off (${sim.strikes.length}/${MAX_STRIKES})`, 'error');
+    if (type === 'recall') toast(`${ac.callsign} hand-off cancelled, back under your control`, 'ok');
     if (type === 'takeover') toast(`${ac.callsign} taken from ${event.from === 'inbound' ? ac.prevUnit : ac.nextUnit}, now under your control`, 'ok');
     if (type === 'stca') toast(`⚠ STCA ${event.a.callsign} – ${event.b.callsign}: separation lost in ${Math.max(0, Math.round(event.t))} s`, 'error');
     // perdita fra voli non nostri: si vede in rosso sul radar, ma non è un errore del giocatore
@@ -855,17 +856,17 @@ function findWaypointAt(t, x, y) {
 //           sull'etichetta la toglie.
 //   Vettore lunghezza del vettore velocità, in minuti.
 //   Mappa   menu dei filtri: punti FRA e zone non attive.
-const DOUBLE_CLICK_MS = 450;   // due clic sul nominativo entro così sono un doppio clic (lo spadino)
-const SELECT_DELAY_MS = 220;   // attesa del secondo clic prima di aprire la rotta: un doppio clic rapido sta qui dentro
-let lastNameClick = { ac: null, t: 0 }; // ultimo clic su un nominativo, per riconoscere il doppio clic
-// Un clic sul nominativo seleziona il volo (traccia cerchiata e rotta celeste) solo se non arriva il secondo clic
-// entro SELECT_DELAY_MS: il doppio clic rapido accende o spegne lo spadino e basta, senza aprire anche la rotta. Un
-// doppio clic più lento (fino a DOUBLE_CLICK_MS) accende comunque lo spadino, ma la rotta a quel punto è già aperta.
-let pendingSelect = null;
+// Traiettoria (rotta celeste fino a destinazione): si apre e si chiude con il clic destro sulla velocità scritta
+// nella label (su Mac clic con due dita o ctrl+clic). Una alla volta; aprendola il volo viene anche selezionato.
+function toggleRoute(ac) {
+  const show = !ac.showRoute;
+  for (const a of sim.aircraft) a.showRoute = false;
+  ac.showRoute = show;
+  if (show) labelPanel.select(ac, false);
+}
 
-function cancelPendingSelect() {
-  if (pendingSelect) clearTimeout(pendingSelect);
-  pendingSelect = null;
+function hideRoutes() {
+  for (const a of sim?.aircraft ?? []) a.showRoute = false;
 }
 // { mode: 'tag' | 'track', ac, onTrack, grabDx, grabDy, startX, startY, x, y, moved }
 let dragState = null;
@@ -975,9 +976,11 @@ canvas.addEventListener('mousedown', (ev) => {
 
 // Clic sulla mappa vuota: con l'etichetta aperta un punto FRA si sceglie per la rotta, altrimenti si deseleziona.
 function emptyClick(t, x, y) {
-  cancelPendingSelect();
   const wp = labelPanel.aircraft && findWaypointAt(t, x, y);
-  if (!wp || !labelPanel.pickWaypoint(wp.id)) labelPanel.deselect();
+  if (!wp || !labelPanel.pickWaypoint(wp.id)) {
+    labelPanel.deselect();
+    hideRoutes();
+  }
 }
 
 function endDrag(ev) {
@@ -994,27 +997,30 @@ function endDrag(ev) {
   // un VFR non si seleziona: la sua label si ruota o si trascina e basta
   if (state.ac.vfr) return;
   try {
-    // clic su un traffico magenta: hand-on
-    if (state.ac.control === 'offered' && !sim.gameOver) sim.handOn(state.ac);
-    // il clic seleziona soltanto (traccia cerchiata e rotta celeste); due clic di fila sul nominativo
-    // accendono o spengono il vettore velocità (lo spadino)
-    const clickAt = performance.now();
-    const onName = tagNameAt(state.x, state.y) === state.ac;
-    const double = onName && lastNameClick.ac === state.ac && clickAt - lastNameClick.t < DOUBLE_CLICK_MS;
-    lastNameClick = onName && !double ? { ac: state.ac, t: clickAt } : { ac: null, t: 0 };
-    cancelPendingSelect();
-    if (double) {
-      state.ac.showVector = !state.ac.showVector;
-    } else if (onName && labelPanel.aircraft !== state.ac) {
-      // primo clic sul nominativo di un volo non selezionato: la selezione aspetta un eventuale secondo clic
-      const { ac } = state;
-      pendingSelect = setTimeout(() => {
-        pendingSelect = null;
-        if (sim && sim.aircraft.includes(ac)) labelPanel.select(ac, false);
-      }, SELECT_DELAY_MS);
-    } else {
+    // clic su un traffico magenta: hand-on e selezione, senza spadino (anche se il clic è sul nominativo)
+    if (state.ac.control === 'offered' && !sim.gameOver) {
+      sim.handOn(state.ac);
       labelPanel.select(state.ac, false);
+      return;
     }
+    // clic sul nominativo di un volo in contatto: hand-off; di nuovo sul nominativo, finché l'ente successivo non
+    // l'ha accettato (nominativo ancora verde), lo si riprende. Dopo l'accettazione serve il tasto T. Altrove sulla
+    // label (o sul nominativo degli altri voli) il clic seleziona il volo. Spadino e traiettoria si aprono con il
+    // clic destro, sul livello e sulla velocità.
+    const { ac } = state;
+    if (tagNameAt(state.x, state.y) === ac && !sim.gameOver) {
+      if (ac.control === 'assumed') {
+        labelPanel.select(ac, false);
+        labelPanel.handOffSelected();
+        return;
+      }
+      if (ac.control === 'transferred' && !ac.xferAccepted) {
+        if (sim.recallHandoff(ac)) labelPanel.select(ac, false);
+        else toast(`${ac.callsign} cannot be taken back: coordinate with ${ac.nextUnit ?? 'the next unit'}`, 'warn');
+        return;
+      }
+    }
+    labelPanel.select(ac, false);
   } catch (err) {
     console.error('Errore nell\'apertura dell\'etichetta', err);
   }
@@ -1165,8 +1171,8 @@ function cancelAction() {
   else if (popupOpen()) showPopup(null);
   else if (tool) setTool(null);
   else {
-    cancelPendingSelect();
     labelPanel.deselect();
+    hideRoutes();
   }
 }
 
@@ -1543,7 +1549,14 @@ window.addEventListener('mouseup', (ev) => {
   const state = panState;
   panState = null;
   panEndedAt = performance.now();
-  if (!state.moved && state.secondary) cancelAction();
+  if (state.moved || !state.secondary) return;
+  // clic destro (o con due dita) sulla velocità di una label: traiettoria; sul livello attuale: spadino; altrove
+  // fa quello che fa Esc
+  const routeAc = speedFieldAt(state.startX, state.startY);
+  const vectorAc = levelFieldAt(state.startX, state.startY);
+  if (routeAc && !sim.gameOver) toggleRoute(routeAc);
+  else if (vectorAc) vectorAc.showVector = !vectorAc.showVector;
+  else cancelAction();
 });
 
 syncRadarMenu();

@@ -366,7 +366,8 @@ export class Aircraft {
     this.turbIn = null;      // zona di turbolenza in cui si trova: {id, since}
     this.wxAvoid = null;     // cella che il traffico non nostro sta aggirando da solo
     this.wxDone = null;      // ultima cella superata: non se ne richiede subito un'altra deviazione
-    this.showVector = false; // vettore velocità, acceso con un doppio clic sul nominativo della label
+    this.showVector = false; // vettore velocità (spadino), acceso e spento con il clic destro sul livello nella label
+    this.showRoute = false;  // traiettoria fino a destinazione, aperta con il clic destro sulla velocità
     this.tagOffset = { x: 30, y: -30 }; // posizione del tag rispetto alla traccia (px): trascinandolo o ruotandolo
     this.tagAngle = 45; // una delle otto posizioni a linea guida fissa (gradi da nord), null se il tag è stato trascinato
 
@@ -378,6 +379,9 @@ export class Aircraft {
     this.transferredAt = null;
     this.acceptDelayS = null;   // dopo quanto l'ente successivo accetta il nostro hand-off
     this.xferAccepted = false;  // l'ente successivo l'ha accettato (traccia bianca)
+    this.missedHandoff = false; // passato d'ufficio perché uscito ancora in contatto: non si riprende
+    this.handoffCounted = false; // l'ultimo hand-off è stato contato come corretto
+    this.handoffStrike = null;  // errore dato all'ultimo hand-off (si toglie se il volo viene ripreso)
     this.exitChecked = false;
     this.exitCoordinated = false; // diretto coordinato oltre il punto d'uscita: l'uscita non si controlla più
     this.levelledAtXflSince = null;
@@ -1477,6 +1481,9 @@ export class Simulation {
     ac.transferredAt = this.simTime;
     ac.acceptDelayS = acceptDelayS();
     ac.xferAccepted = false;
+    ac.missedHandoff = missed;
+    ac.handoffCounted = correct;
+    ac.handoffStrike = null;
     // passato con l'allarme STCA acceso: finché resta nel settore la separazione è ancora nostra
     ac.handedInStca = !!ac.stca;
     ac.lastInstruction = `Hand-off a ${ac.nextUnit}`;
@@ -1488,12 +1495,31 @@ export class Simulation {
       // è quello imposto dall'avaria e non conta come errore. Il messaggio lo scrive
       // _updateEmergency, che chiude l'emergenza con una sola riga
     } else {
-      this._strike(ac, missed
+      ac.handoffStrike = this._strike(ac, missed
         ? 'hand-off mancato: uscito dal settore ancora in contatto'
         : `FL${ac.clearedFL} invece di FL${ac.requestedExitFL} richiesto`);
     }
     this._emit('event', { type: missed ? 'missed' : 'handoff', ac, correct, emergency: !!ac.emergency });
     return correct;
+  }
+
+  // Ripresa di un volo appena passato che l'ente successivo non ha ancora accettato (clic sul nominativo): torna
+  // nostro com'era prima dell'hand-off. Un hand-off ripreso non conta, né come corretto né come errore: lo si
+  // riprende proprio per correggerlo. Non si riprendono i voli usciti senza hand-off né quelli in emergenza (il
+  // trasferimento si coordina a voce); dopo l'accettazione serve la presa coordinata (tasto T).
+  recallHandoff(ac) {
+    if (this.gameOver || ac.control !== 'transferred' || ac.xferAccepted || ac.missedHandoff || ac.emergency) return false;
+    if (ac.handoffCounted) this.stats.handedOff--;
+    if (ac.handoffStrike) this.strikes = this.strikes.filter((s) => s !== ac.handoffStrike);
+    ac.handoffCounted = false;
+    ac.handoffStrike = null;
+    ac.control = 'assumed';
+    ac.transferredAt = null;
+    ac.acceptDelayS = null;
+    ac.handedInStca = false;
+    ac.lastInstruction = 'Hand-off annullato: di nuovo in contatto';
+    this._emit('event', { type: 'recall', ac });
+    return true;
   }
 
   // --- messaggi radio ed emergenze ---------------------------------------------
@@ -2078,8 +2104,10 @@ export class Simulation {
   }
 
   _strike(ac, reason) {
-    this.strikes.push({ callsign: ac.callsign, reason });
+    const strike = { callsign: ac.callsign, reason };
+    this.strikes.push(strike);
     if (this.strikes.length >= MAX_STRIKES) this._endGame('handoff', { strikes: this.strikes });
+    return strike;
   }
 
   _endGame(reason, detail) {
