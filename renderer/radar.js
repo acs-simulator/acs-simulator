@@ -507,35 +507,28 @@ function drawClock(ctx, sim) {
 
 function drawRouteLine(ctx, t, ac) {
   if (!ac.route || ac.route.length === 0) return;
-  const exitIndex = ac.exitIndex;
-  const points = ac.route.slice(0, Math.min(exitIndex + 2, ac.route.length))
-    .map((id) => ({ id, wp: waypoint(id) }))
-    .filter((p) => p.wp);
+  // tutta la rotta che resta, fino alla destinazione, con linea continua anche oltre il confine del settore
+  const points = ac.route.map((id) => ({ id, wp: waypoint(id) })).filter((p) => p.wp);
   let prev = t.toPx(ac.x, ac.y);
+  ctx.setLineDash([]);
   ctx.lineWidth = 1.6;
   ctx.font = `bold 11px ${MONO}`;
-  points.forEach(({ id, wp }, i) => {
+  ctx.strokeStyle = COLORS.route;
+  ctx.fillStyle = COLORS.route;
+  for (const { id, wp } of points) {
     const p = t.toPx(wp.x, wp.y);
-    const afterExit = i > exitIndex;
-    ctx.strokeStyle = COLORS.route;
-    ctx.setLineDash(afterExit ? [5, 5] : []);
     ctx.beginPath();
     ctx.moveTo(prev.px, prev.py);
     ctx.lineTo(p.px, p.py);
     ctx.stroke();
-    ctx.setLineDash([]);
-    if (!afterExit) {
-      ctx.fillStyle = COLORS.route;
-      ctx.fillText(id, p.px + 6, p.py - 5);
-    }
+    ctx.fillText(id, p.px + 6, p.py - 5);
     if (id === ac.exitFix) {
-      ctx.strokeStyle = COLORS.route;
       ctx.beginPath();
       ctx.arc(p.px, p.py, 9, 0, Math.PI * 2);
       ctx.stroke();
     }
     prev = p;
-  });
+  }
 }
 
 function drawFutureConflict(ctx, t, conflict) {
