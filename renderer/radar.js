@@ -21,7 +21,7 @@ const TAG_LINE = 15;
 export const COLORS = {
   assumed: '#7CFC9A',
   offered: '#ff5bd8',
-  inbound: '#47804d',
+  inbound: '#006400',
   transferred: '#ffffff',
   notInContact: '#e8d45a',
   conflict: '#ff4d4d',
