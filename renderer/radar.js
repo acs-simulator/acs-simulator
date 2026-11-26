@@ -22,7 +22,7 @@ const TAG_LINE = 15;
 export const COLORS = {
   assumed: '#7CFC9A',
   offered: '#ff5bd8',
-  inbound: '#006400',
+  inbound: '#3CB45A',
   transferred: '#ffffff',
   notInContact: '#ffffff',
   vfr: '#e8d45a',
@@ -1159,7 +1159,7 @@ const XFL_NEAR_FT = 2000;                     // livello arancione a meno di 200
 const MISMATCH = '#ff9f40';                   // livello selezionato a bordo diverso dall'autorizzato
 const XFL_COLOR = '#d68cff';                  // livello d'uscita
 const XFL_EMPTY = '#e8eef0';
-const HOVER_BG = 'rgba(92, 100, 112, 0.9)';
+const HOVER_BG = 'rgba(66, 74, 86, 0.9)';  // grigio scuro quanto basta perché i due verdi, il ciano e il viola si leggano
 const HOVER_BORDER = 'rgba(210, 218, 228, 0.7)';
 
 function cwOf(ctx) {
