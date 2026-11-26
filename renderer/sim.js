@@ -35,6 +35,8 @@ export const HISTORY_S = 12;
 const MAX_HISTORY = 10;
 
 export const SEP_HORIZONTAL_NM = 5;
+// sotto il nostro limite inferiore, fra voli dell'avvicinamento (TMA), la separazione radar minima è 3 NM
+const SEP_TMA_NM = 3;
 export const SEP_VERTICAL_FT = 1000;
 export const CONFLICT_LOOKAHEAD_S = 300; // 5 minuti
 export const MAX_STRIKES = 3;
@@ -2743,21 +2745,26 @@ export class Simulation {
       for (let j = i + 1; j < this.aircraft.length; j++) {
         const a = this.aircraft[i];
         const b = this.aircraft[j];
-        if (distance(a, b) < SEP_HORIZONTAL_NM && Math.abs(a.altitude - b.altitude) < SEP_VERTICAL_FT) {
-          // in rosso sul radar in ogni caso; la partita finisce solo se uno dei due è di nostra competenza.
-          // Una perdita cominciata fra voli altrui resta loro finché la separazione non torna, anche se nel
-          // frattempo uno dei due ci viene offerto o entra nel settore: ce l'hanno consegnato così
-          a.conflict = true;
-          b.conflict = true;
-          const key = `${Math.min(a.id, b.id)}-${Math.max(a.id, b.id)}`;
-          const inherited = this._lossKeys.has(key);
-          if (!inherited && (isResponsible(a, this.simTime) || isResponsible(b, this.simTime))) {
-            this._endGame('separation', { a, b });
-            continue;
-          }
-          losses.add(key);
-          if (!inherited) this._emit('event', { type: 'loss-other', a, b });
+        if (Math.abs(a.altitude - b.altitude) >= SEP_VERTICAL_FT) continue;
+        const d = distance(a, b);
+        if (d >= SEP_HORIZONTAL_NM) continue;
+        const ours = isResponsible(a, this.simTime) || isResponsible(b, this.simTime);
+        // voli di altri enti entrambi sotto il nostro limite inferiore: sono dell'avvicinamento, che nella TMA li
+        // separa a 3 NM (per esempio sui due rami paralleli delle STAR di Fiumicino, a circa 5 NM l'uno dall'altro)
+        if (!ours && d >= SEP_TMA_NM && a.altitude < airspace.floorFt && b.altitude < airspace.floorFt) continue;
+        // in rosso sul radar in ogni caso; la partita finisce solo se uno dei due è di nostra competenza.
+        // Una perdita cominciata fra voli altrui resta loro finché la separazione non torna, anche se nel
+        // frattempo uno dei due ci viene offerto o entra nel settore: ce l'hanno consegnato così
+        a.conflict = true;
+        b.conflict = true;
+        const key = `${Math.min(a.id, b.id)}-${Math.max(a.id, b.id)}`;
+        const inherited = this._lossKeys.has(key);
+        if (!inherited && ours) {
+          this._endGame('separation', { a, b });
+          continue;
         }
+        losses.add(key);
+        if (!inherited) this._emit('event', { type: 'loss-other', a, b });
       }
     }
     this._lossKeys = losses;
