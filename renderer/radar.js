@@ -15,10 +15,14 @@ export const MONO = 'Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", mon
 export const TAG_W = 116;
 const TAG_LINE = 15;
 
-// Colori per stato di controllo.
+// Colori per stato di controllo, come in sala ACC: verde scuro il volo che entrerà nel settore ma è ancora
+// dell'ente precedente, magenta quando ce lo passano, verde in contatto; dopo il nostro hand-off bianco con il solo
+// nominativo verde finché l'ente successivo non lo accetta, poi tutto bianco. Giallo il traffico di altri.
 export const COLORS = {
   assumed: '#7CFC9A',
   offered: '#ff5bd8',
+  inbound: '#47804d',
+  transferred: '#ffffff',
   notInContact: '#e8d45a',
   conflict: '#ff4d4d',
   warning: '#ffb84d',
@@ -822,6 +826,8 @@ function aircraftColor(ac) {
   if (ac.emergency) return ac.emergency.urgency === 'MAYDAY' ? COLORS.conflict : COLORS.warning;
   if (ac.control === 'assumed') return COLORS.assumed;
   if (ac.control === 'offered') return COLORS.offered;
+  if (ac.control === 'inbound') return COLORS.inbound;
+  if (ac.control === 'transferred') return COLORS.transferred;
   return COLORS.notInContact;
 }
 
@@ -1260,8 +1266,10 @@ function labelRows(ctx, ac, color, hovered) {
   };
   const evolving = isEvolving(ac);
 
-  // il nominativo resta nel colore della label anche da selezionato: la selezione si vede dal cerchio sulla traccia
-  const nameRow = [field(ac.callsign, 0, color, 'name', NAME_FONT)];
+  // il nominativo resta nel colore della label anche da selezionato: la selezione si vede dal cerchio sulla traccia.
+  // Passato e non ancora accettato dall'ente successivo: label bianca, nominativo ancora verde
+  const pendingXfer = ac.control === 'transferred' && !ac.xferAccepted && color === COLORS.transferred;
+  const nameRow = [field(ac.callsign, 0, pendingXfer ? COLORS.assumed : color, 'name', NAME_FONT)];
   ctx.font = NAME_FONT;
   let nameEnd = ctx.measureText(ac.callsign).width;
   // asterisco rosso: proseguendo con rotta e livello autorizzato il volo entrerà in una zona attiva

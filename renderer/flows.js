@@ -12,6 +12,7 @@ const MIN_PAIR_NM = 110;
 const CORRIDOR_NM = 9;         // punti FRA considerati lungo la rotta diretta
 const POINT_SPACING_NM = 30;
 const COP_SNAP_NM = 25;        // distanza massima fra attraversamento del confine e COP
+const FIR_SNAP_NM = 15;        // voli da o per l'estero: punto FRA d'ingresso (E) o d'uscita (X) entro tanto dalla rotta
 const MAX_TURN_DEG = 50;
 const SAMPLE_NM = 2;
 export const MIN_INSIDE_NM = 25; // tratta minima nel volume per considerare il volo di competenza: chi taglia
@@ -185,17 +186,25 @@ function chooseStar(A, o, d) {
   return best;
 }
 
+// Il piano di volo è completo da aeroporto ad aeroporto: SID, tutti i punti FRA italiani lungo la rotta, STAR.
+// Fuori dall'Italia la carta FRA non ha punti: un volo da o per l'estero va diretto fra l'aeroporto estero e il
+// punto FRA d'ingresso (E) o d'uscita (X) sul confine.
 function buildFlow(A, o, d, viewClip) {
   const track = bearing(o, d);
+  const italian = (ap) => ap.icao.startsWith('LI');
 
-  // SID e STAR degli aeroporti visibili; senza procedure, i punti di collegamento FRA (D e A) della carta
+  // SID e STAR delle piste in uso; senza procedure, i punti di collegamento FRA (D e A) della carta. Per gli
+  // aeroporti visibili SID e STAR guidano anche il profilo e i passaggi con l'avvicinamento (flow.sid, flow.star);
+  // per quelli lontani sono solo i punti del piano di volo
   const local = (ap) => ap.x >= A.view.xMin - 20 && ap.x <= A.view.xMax + 20 && ap.y >= A.view.yMin - 20 && ap.y <= A.view.yMax + 20;
   const sid = local(o) ? chooseSid(A, o, d) : null;
   const star = local(d) ? chooseStar(A, o, d) : null;
-  const dep = !sid && local(o) ? connectingPoint(A, o, track, 'D', true) : null;
-  const arr = !star && local(d) ? connectingPoint(A, d, track, 'A', false) : null;
-  const head = sid ? sid.points : dep ? [dep] : [];
-  const tail = star ? star.points : arr && arr !== dep ? [arr] : [];
+  const farSid = !local(o) && italian(o) ? chooseSid(A, o, d) : null;
+  const farStar = !local(d) && italian(d) ? chooseStar(A, o, d) : null;
+  const dep = !sid && !farSid && (local(o) || italian(o)) ? connectingPoint(A, o, track, 'D', true) : null;
+  const arr = !star && !farStar && (local(d) || italian(d)) ? connectingPoint(A, d, track, 'A', false) : null;
+  const head = sid ? sid.points : farSid ? farSid.points : dep ? [dep] : [];
+  const tail = star ? star.points : farStar ? farStar.points : arr && arr !== dep ? [arr] : [];
   // tratto in rotta: dalla fine della SID all'inizio della STAR
   const a = head.length ? head[head.length - 1] : o;
   const b = tail.length ? tail[0] : d;
@@ -228,26 +237,34 @@ function buildFlow(A, o, d, viewClip) {
       if (cop && cop !== a && cop !== b && tOf(cop) > 0 && tOf(cop) < 1) kept.push({ w: cop, t: tOf(cop), fixed: true });
     }
 
-    // punti FRA sul tratto in rotta visibile, spaziati (anche dalla fine della SID e dall'inizio della STAR)
-    const rect = { xMin: A.view.xMin - 10, xMax: A.view.xMax + 10, yMin: A.view.yMin - 10, yMax: A.view.yMax + 10 };
-    const clip = clipSegmentToRect(a, b, rect);
-    if (clip) {
-      const tMin = Math.max(clip[0] - 60 / len, 0.002);
-      const tMax = Math.min(clip[1] + 60 / len, 0.998);
-      const corridor = A.waypoints
-        .filter((w) => w !== a && w !== b && tOf(w) > tMin && tOf(w) < tMax && off(w) <= CORRIDOR_NM)
-        .sort((p, q) => off(p) - off(q));
-      for (const w of corridor) {
-        if (kept.some((k) => k.w === w || distance(k.w, w) < POINT_SPACING_NM)) continue;
-        if (distance(a, w) < POINT_SPACING_NM / 2 || distance(b, w) < POINT_SPACING_NM / 2) continue;
-        kept.push({ w, t: tOf(w), fixed: false });
-      }
+    // voli da o per l'estero: il punto d'ingresso (E) più vicino all'origine e quello d'uscita (X) più vicino alla
+    // destinazione lungo la rotta; oltre, verso l'estero, nessun punto
+    const firPoint = (letter, first) => A.waypoints
+      .filter((w) => w.types.includes(letter) && off(w) <= FIR_SNAP_NM && tOf(w) > 0.002 && tOf(w) < 0.998)
+      .reduce((best, w) => (!best || (first ? tOf(w) < tOf(best) : tOf(w) > tOf(best)) ? w : best), null);
+    const firIn = !italian(o) && a === o ? firPoint('E', true) : null;
+    const firOut = !italian(d) && b === d ? firPoint('X', false) : null;
+    const tLo = firIn ? tOf(firIn) : 0.002;
+    const tHi = firOut ? tOf(firOut) : 0.998;
+    // scelti per primi (gli altri si spaziano da loro), ma come gli altri punti si tolgono se impongono virate strette
+    for (const w of [firIn, firOut]) {
+      if (w && !kept.some((k) => k.w === w || distance(k.w, w) < POINT_SPACING_NM / 2)) kept.push({ w, t: tOf(w), fixed: false });
+    }
+
+    // punti FRA lungo tutto il tratto in rotta, spaziati (anche dalla fine della SID e dall'inizio della STAR)
+    const corridor = A.waypoints
+      .filter((w) => w !== a && w !== b && tOf(w) > tLo && tOf(w) < tHi && off(w) <= CORRIDOR_NM)
+      .sort((p, q) => off(p) - off(q));
+    for (const w of corridor) {
+      if (kept.some((k) => k.w === w || distance(k.w, w) < POINT_SPACING_NM)) continue;
+      if (distance(a, w) < POINT_SPACING_NM / 2 || distance(b, w) < POINT_SPACING_NM / 2) continue;
+      kept.push({ w, t: tOf(w), fixed: false });
     }
     seq.push(...kept.sort((p, q) => p.t - q.t));
 
     // elimina i punti che impongono virate troppo strette (mai i COP)
     let points = [a, ...seq.map((k) => k.w), b];
-    for (let guard = 0; guard < 10; guard++) {
+    for (let guard = 0; guard < 60; guard++) {
       const worst = maxTurn(points);
       if (worst.deg <= MAX_TURN_DEG) break;
       const item = seq[worst.index - 1];

@@ -9,7 +9,7 @@ import {
 import { LabelPanel } from './label.js';
 import { emergencyCall } from './emergency.js';
 import { REQUEST_TAG } from './requests.js';
-import { airspace, loadSector, sectorSummary, isFraPoint, inView } from './airspace.js';
+import { airspace, loadSector, sectorSummary, isFraPoint } from './airspace.js';
 import {
   SECTORS, DIFFICULTY, DIFFICULTY_ORDER, sectorDemand, LAYERS, LAYER_ORDER, ACC_BOUNDARY, CENTRES, CENTRE, setCentre,
 } from './sectors.js';
@@ -1172,15 +1172,18 @@ const range = (from, to, step) => {
 };
 const pad3 = (v) => String(v).padStart(3, '0');
 
-// Prossimo punto: prima quelli della rotta (fino al punto d'uscita, oltre è di altri enti), poi gli altri punti
-// FRA sulla mappa, dal più vicino.
+// Prossimo punto: solo i punti del piano di volo che restano, fino alla destinazione. I punti sorvolati in
+// navigazione escono dalla rotta; su prua assegnata la rotta resta ferma, quindi il primo è l'ultimo punto verso cui
+// il volo era diretto, anche se nel frattempo l'ha superato. Quelli oltre il punto d'uscita sono di altri enti: un
+// diretto lì è coordinato con l'ente successivo.
 function fixItems(ac) {
-  const onRoute = ac.route.slice(0, ac.exitIndex + 1).filter((id) => isFraPoint(id));
-  const others = airspace.waypoints
-    .filter((w) => isFraPoint(w.id) && !onRoute.includes(w.id) && inView(w, 40))
-    .sort((a, b) => distance(ac, a) - distance(ac, b))
-    .map((w) => w.id);
-  return [{ group: 'Rotta' }, ...onRoute, { group: 'Altri punti' }, ...others];
+  const ahead = ac.route.map((id, idx) => ({ id, idx })).filter((r) => isFraPoint(r.id));
+  const limit = ac.exitIndex;
+  const inside = ahead.filter((r) => r.idx <= limit).map((r) => r.id);
+  const beyond = ahead.filter((r) => r.idx > limit).map((r) => r.id);
+  const items = [{ group: 'Piano di volo' }, ...inside];
+  if (beyond.length) items.push({ group: `Oltre ${ac.route[limit]}` }, ...beyond);
+  return items;
 }
 
 // Campi della label che si cliccano: titolo, valori (numeri, oppure {group} per un'intestazione), valore

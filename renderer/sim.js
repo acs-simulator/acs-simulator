@@ -46,6 +46,23 @@ const EXIT_POINT_TOLERANCE_NM = 8; // scostamento laterale massimo dal punto d'u
 const XFL_LEVEL_WARN_S = 30;       // uscita dall'alto o dal basso: volo livellato all'XFL e ancora in contatto
 const TRANSFER_BELOW_FT = 2000;    // l'ente inferiore porta subito il volo almeno così sotto il nostro limite
 const TAKEOVER_S = 20;             // dopo l'hand-off l'ente successivo comincia a dare le sue istruzioni
+// Il controllore dell'ente successivo accetta il volo (traccia tutta bianca) quando il pilota lo chiama: di
+// solito dopo 6-24 s, a volte (frequenza occupata, controllore impegnato) dopo 25-50 s. Prima di allora il volo
+// non riceve sue istruzioni e la separazione resta nostra finché è nel settore.
+const ACCEPT_S = [6, 24];
+const ACCEPT_BUSY_S = [25, 50];
+const ACCEPT_BUSY_P = 0.15;
+
+function acceptDelayS() {
+  const [lo, hi] = Math.random() < ACCEPT_BUSY_P ? ACCEPT_BUSY_S : ACCEPT_S;
+  return lo + Math.random() * (hi - lo);
+}
+
+// Secondi dopo l'hand-off in cui il volo è ancora sulla nostra autorizzazione: fino all'accettazione
+// dell'ente successivo e comunque per almeno TAKEOVER_S.
+function takeoverS(ac) {
+  return Math.max(TAKEOVER_S, ac.acceptDelayS ?? 0);
+}
 const OFFER_CHECK_S = 4;           // ogni quanto si prevede se un volo in arrivo sta per entrare nel settore
 const OFFER_BAND_FT = 1000;        // ...arrivandoci al più così sotto o sopra i limiti verticali
 const WITHDRAW_CHECK_S = 10;       // ogni quanto si controlla se un volo in arrivo entrerà ancora nel settore
@@ -358,7 +375,10 @@ export class Aircraft {
     this.wasLateral = insideLateral(this) && (this.entryS === null || this.alongTrackNm() >= this.entryS - ENTRY_TOLERANCE_NM);
     this.outsideSince = null;
     this.transferredAt = null;
+    this.acceptDelayS = null;   // dopo quanto l'ente successivo accetta il nostro hand-off
+    this.xferAccepted = false;  // l'ente successivo l'ha accettato (traccia bianca)
     this.exitChecked = false;
+    this.exitCoordinated = false; // diretto coordinato oltre il punto d'uscita: l'uscita non si controlla più
     this.levelledAtXflSince = null;
     this.xflWarned = false;
   }
@@ -457,21 +477,32 @@ export class Aircraft {
     this.turnDirection = null;
   }
 
-  // Diretto a un punto già in rotta, al più fino al punto d'uscita (che non si può saltare).
-  directToRouteIndex(index) {
-    if (this.noRadio || index < 0 || index > this.exitIndex) return false;
+  // Diretto a un punto già in rotta, di norma al più fino al punto d'uscita. beyondExit: anche a un punto del
+  // piano di volo oltre l'uscita, come diretto coordinato con l'ente successivo: quel punto diventa il nuovo
+  // limite della rotta (e il punto d'uscita, se il volo esce lateralmente o sulla STAR) e il punto d'uscita
+  // richiesto prima non si controlla più.
+  directToRouteIndex(index, { beyondExit = false } = {}) {
+    const limit = this.exitIndex;
+    if (this.noRadio || index < 0 || index >= this.route.length || (index > limit && !beyondExit)) return false;
     this.instrSeq++;
+    if (index > limit) {
+      const target = this.route[index];
+      if (this.exitFix) this.exitFix = target;
+      this.routeLimitFix = target;
+      this.exitCoordinated = true;
+    }
     this.route.splice(0, index);
     this.mode = 'route';
     this.turnDirection = null;
     return true;
   }
 
-  // Diretto a un punto qualsiasi e poi al punto d'uscita richiesto: l'uscita non cambia mai.
-  directTo(waypointId) {
+  // Diretto a un punto qualsiasi e poi al punto d'uscita richiesto: l'uscita non cambia mai (salvo un diretto
+  // coordinato a un punto del piano oltre l'uscita, vedi directToRouteIndex).
+  directTo(waypointId, { beyondExit = false } = {}) {
     if (this.noRadio || !waypoint(waypointId)) return false;
     const idx = this.route.indexOf(waypointId);
-    if (idx >= 0) return this.directToRouteIndex(idx);
+    if (idx >= 0) return this.directToRouteIndex(idx, { beyondExit });
     this.instrSeq++;
     this.route = [waypointId, ...this.route.slice(this.exitIndex)];
     this.mode = 'route';
@@ -806,7 +837,7 @@ export function isResponsible(ac, now) {
   if (ac.control === 'assumed') return true;
   if (!insideVolume(ac)) return false;
   if (ac.control === 'offered') return true;
-  return ac.control === 'transferred' && (now - ac.transferredAt <= TAKEOVER_S || !!ac.handedInStca);
+  return ac.control === 'transferred' && (now - ac.transferredAt <= takeoverS(ac) || !!ac.handedInStca);
 }
 
 export class Simulation {
@@ -1435,6 +1466,8 @@ export class Simulation {
     if (Number.isFinite(lead)) this._handoffLeadS += HANDOFF_LEAD_WEIGHT * (clamp(lead, 0, 900) - this._handoffLeadS);
     ac.control = 'transferred';
     ac.transferredAt = this.simTime;
+    ac.acceptDelayS = acceptDelayS();
+    ac.xferAccepted = false;
     // passato con l'allarme STCA acceso: finché resta nel settore la separazione è ancora nostra
     ac.handedInStca = !!ac.stca;
     ac.lastInstruction = `Hand-off a ${ac.nextUnit}`;
@@ -2118,7 +2151,7 @@ export class Simulation {
       const ahead = { x: ac.x + Math.sin(rad) * reach, y: ac.y - Math.cos(rad) * reach };
       const off = fix ? distanceToSegment(fix, back, ahead) : 0;
       // un volo che ha deviato per un temporale esce dove può: si coordina a voce, non è un errore
-      if (withinBand && off > EXIT_POINT_TOLERANCE_NM && !ac.wxDeviated && !ac.emergency) {
+      if (withinBand && off > EXIT_POINT_TOLERANCE_NM && !ac.wxDeviated && !ac.emergency && !ac.exitCoordinated) {
         this._strike(ac, `uscito a ${Math.round(off)} NM da ${ac.exitFix}, punto d'uscita richiesto`);
         this._emit('event', { type: 'offpoint', ac, off });
       }
@@ -2178,12 +2211,18 @@ export class Simulation {
       // avaria radio passata all'ente successivo: nessuno può istruirlo, segue la regola del 7600
       radioFailureStep(ac, ac.emergency.holdLeftS, profileFt, profilePhase(ac.profile, ac.profileS));
     } else if (ac.control === 'transferred') {
-      // l'ente successivo riporta il volo sul suo profilo, sulla rotta e sulla velocità propria
+      // l'ente successivo accetta il volo quando il pilota lo chiama, poi lo riporta sul suo profilo, sulla rotta
+      // e sulla velocità propria
       const elapsed = this.simTime - ac.transferredAt;
-      if (elapsed > TAKEOVER_S) ac.assignedAltitude = transferredAltitude(ac, profileFt, profilePhase(ac.profile, ac.profileS));
-      if (elapsed > 40 && ac.mode === 'heading') ac.resumeOwnNavigation();
-      if (elapsed > 40) ac.resumeOwnSpeed();
-      if (elapsed > TAKEOVER_S) applyResolution(ac);
+      if (!ac.xferAccepted && elapsed >= (ac.acceptDelayS ?? 0)) {
+        ac.xferAccepted = true;
+        this._emit('event', { type: 'accepted', ac });
+      }
+      const takeover = takeoverS(ac);
+      if (elapsed > takeover) ac.assignedAltitude = transferredAltitude(ac, profileFt, profilePhase(ac.profile, ac.profileS));
+      if (elapsed > takeover + 20 && ac.mode === 'heading') ac.resumeOwnNavigation();
+      if (elapsed > takeover + 20) ac.resumeOwnSpeed();
+      if (elapsed > takeover) applyResolution(ac);
     }
 
     if (lateral && reached) ac.wasLateral = true;

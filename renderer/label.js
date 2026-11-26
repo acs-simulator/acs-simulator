@@ -10,7 +10,7 @@ import { areaBand } from './areas.js';
 const CONTROL_LABELS = {
   assumed: 'IN CONTATTO',
   offered: 'DA ASSUMERE',
-  inbound: 'NON IN CONTATTO',
+  inbound: 'IN ARRIVO',
   other: 'NON IN CONTATTO',
   transferred: 'TRASFERITO',
 };
@@ -226,7 +226,7 @@ export class LabelPanel {
     el.badgeMode.textContent = ac.mode === 'heading' ? 'PRUA ASSEGNATA' : 'ROTTA PROPRIA';
     el.badgeMode.classList.toggle('heading', ac.mode === 'heading');
     el.badgeControl.textContent = ac.control === 'transferred' && ac.nextUnit
-      ? `TRASFERITO A ${ac.nextUnit}`
+      ? `${ac.xferAccepted ? 'ACCETTATO DA' : 'TRASFERITO A'} ${ac.nextUnit}`
       : CONTROL_LABELS[ac.control];
     el.badgeControl.dataset.control = ac.control;
     el.badgeKind.textContent = `${ac.type.icao}/${ac.type.wake} · ${KIND_LABELS[ac.kind]}`;
@@ -794,7 +794,7 @@ export class LabelPanel {
       ac.lastInstruction = `Vira a ${side === 'right' ? 'destra' : 'sinistra'} prua ${fmtHeading(value)}`;
       field = 'heading';
     } else if (kind === 'fix') {
-      if (!ac.directTo(value)) return null;
+      if (!ac.directTo(value, { beyondExit: true })) return null;
       ac.lastInstruction = `Diretto a ${value}`;
       this._routeKey = '';
     } else if (kind === 'rate') {
