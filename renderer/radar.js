@@ -828,26 +828,31 @@ function aircraftColor(ac) {
 
 const pad = (fl) => Math.round(fl).toString().padStart(3, '0');
 
-// Volo VFR (squawk 7000): traccia gialla e, accanto, solo la quota Mode C (centinaia di piedi) e la velocità al
-// suolo; niente nominativo né linea guida, come per un aereo non identificato che vola a vista. Le due righe si
-// vedono sempre, anche con il filtro dei livelli delle etichette (i VFR volano tutti sotto i settori alti).
+// Volo VFR (squawk 7000): traccia gialla e, accanto, il nominativo (la marca, fittizia), la quota Mode C (centinaia
+// di piedi) e la velocità al suolo; nient'altro, né linea guida. Le tre righe si vedono sempre, anche con il filtro
+// dei livelli delle etichette (i VFR volano tutti sotto i settori alti).
 const VFR_FONT = `12px ${MONO}`;
+const VFR_NAME_FONT = `bold 12px ${MONO}`;
 function drawVfr(ctx, t, f) {
   const color = COLORS.vfr;
   drawTrack(ctx, t, f, color, 0.85);
-  const fl = Math.round(f.altitude / 100);
   const { px, py } = t.toPx(f.x, f.y);
-  ctx.font = VFR_FONT;
   ctx.lineJoin = 'round';
   ctx.lineWidth = 3;
   ctx.strokeStyle = HALO;
   ctx.fillStyle = color;
   ctx.globalAlpha = 0.9;
   const x = px + 8;
-  [[pad(fl), py - 4], [pad(f.speed), py + 9]].forEach(([text, y]) => {
+  const rows = [
+    [f.callsign ?? '', py - 10, VFR_NAME_FONT],
+    [pad(f.altitude / 100), py + 3, VFR_FONT],
+    [pad(f.speed), py + 16, VFR_FONT],
+  ];
+  for (const [text, y, font] of rows) {
+    ctx.font = font;
     ctx.strokeText(text, x, y);
     ctx.fillText(text, x, y);
-  });
+  }
   ctx.globalAlpha = 1;
 }
 

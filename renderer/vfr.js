@@ -1,6 +1,12 @@
 // Traffico VFR (squawk 7000) sotto e attorno al settore: aviazione generale che vola a vista fra aviosuperfici e
 // aeroporti, o resta in zona per un volo locale. È solo un arricchimento del radar: non è mai di nostra competenza,
-// non entra nel calcolo della separazione e sul radar ne restano soltanto la quota (Mode C) e la velocità al suolo.
+// non entra nel calcolo della separazione e sul radar ne restano il nominativo, la quota (Mode C) e la velocità al
+// suolo.
+//
+// Il nominativo è la marca di immatricolazione, fittizia ma secondo le regole (scritta senza trattino, come la
+// trasmette il Mode S e come si scrive nel piano di volo): in Italia I- e quattro lettere (I-ABCD); gli ultraleggeri
+// (VDS) I- e quattro caratteri, cifre o una lettera e tre cifre (I-8361, I-C726). Vicino ai confini del nord qualche
+// velivolo straniero: Germania D-E e tre lettere, Francia F-G, Svizzera HB-, Austria OE-K.
 //
 // Quote e velocità sono quelle vere dell'aviazione generale: ultraleggeri ed elicotteri bassi (1500-3000 ft), gli
 // altri ai livelli VFR semicircolari sopra i 3000 ft (rotta 000-179: migliaia dispari + 500 ft, 3500, 5500...;
@@ -11,7 +17,7 @@ import { normalizeDeg, angleDiff, bearing, distance, pointInPolygon } from './ge
 
 // velocità al suolo (kt), quota massima tipica (ft) e peso nel traffico
 const TYPES = [
-  { kind: 'ulm', gs: [70, 95], low: true, weight: 3 },
+  { kind: 'ulm', gs: [70, 95], low: true, ulm: true, weight: 3 },
   { kind: 'c172', gs: [98, 115], ceiling: 9500, weight: 5 },
   { kind: 'pa28', gs: [105, 125], ceiling: 9500, weight: 3 },
   { kind: 'da40', gs: [115, 135], ceiling: 10500, weight: 2 },
@@ -19,6 +25,9 @@ const TYPES = [
   { kind: 'heli', gs: [95, 125], low: true, weight: 1 },
 ];
 const LEVEL_WEIGHTS = [[3500, 5], [4500, 5], [5500, 4], [6500, 3], [7500, 2], [8500, 1], [9500, 1], [10500, 0.4], [11500, 0.2]];
+const FOREIGN = [['DE', 3], ['FG', 3], ['HB', 3], ['OEK', 2]]; // prefisso senza trattino, completato a 5 caratteri
+const NORTH_LAT = 45;                       // sopra questa latitudine (Alpi, pianura padana) più stranieri
+const LETTERS = 'ABCDEFGHIJKLMNOPRSTUVWXYZ'; // niente Q: i gruppi Q sono codici radio
 const DAY_UTC = [6.5 * 3600, 16.5 * 3600]; // fascia con traffico VFR pieno
 const DUSK_S = 3600;                        // dopo, nell'ora successiva, si spegne
 const TRAIL_S = 12;                         // come le tracce radar (sim.js HISTORY_S)
@@ -78,6 +87,35 @@ export class VfrTraffic {
     return { x: ap.x + Math.sin(a) * r, y: ap.y - Math.cos(a) * r };
   }
 
+  _letter() {
+    return LETTERS[Math.floor(this.rnd() * LETTERS.length)];
+  }
+
+  _digit(from = 0) {
+    return String(from + Math.floor(this.rnd() * (10 - from)));
+  }
+
+  // Marca fittizia secondo le regole di immatricolazione (vedi in testa), diversa da quelle già in vista.
+  _registration(type, lat) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      let reg;
+      const foreign = this.rnd() < (lat >= NORTH_LAT ? 0.15 : 0.04);
+      if (foreign && !type.ulm) {
+        const prefix = this._pick(FOREIGN, (f) => f[1])[0];
+        reg = prefix;
+        while (reg.length < 5) reg += this._letter();
+      } else if (type.ulm) {
+        reg = this.rnd() < 0.6
+          ? `I${this._digit(1)}${this._digit()}${this._digit()}${this._digit()}`
+          : `I${this._letter()}${this._digit()}${this._digit()}${this._digit()}`;
+      } else {
+        reg = `I${this._letter()}${this._letter()}${this._letter()}${this._letter()}`;
+      }
+      if (!this.flights.some((f) => f.callsign === reg)) return reg;
+    }
+    return null;
+  }
+
   // Quota di crociera: livello VFR semicircolare per la rotta, oppure bassa per ultraleggeri ed elicotteri.
   _cruise(type, track) {
     if (type.low) return Math.round(this._between(1500, 3000) / 100) * 100;
@@ -124,9 +162,11 @@ export class VfrTraffic {
     const type = this._pick(TYPES, (t) => t.weight);
     const track = bearing(plan.start, plan.points[0]);
     const cruise = this._cruise(type, track);
+    const { lat } = airspace.projection.toLatLon(plan.start.x, plan.start.y);
     const f = {
       id: ++this._id,
       vfr: true,
+      callsign: this._registration(type, lat),
       type,
       x: plan.start.x,
       y: plan.start.y,
