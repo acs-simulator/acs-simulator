@@ -20,7 +20,7 @@ const TAG_LINE = 15;
 // nominativo verde finché l'ente successivo non lo accetta, poi tutto bianco. Bianco anche il traffico di altri
 // settori; giallo solo il traffico VFR (squawk 7000), di cui si leggono soltanto quota e velocità.
 export const COLORS = {
-  assumed: '#7CFC9A',
+  assumed: '#2EFF55',  // verde intenso: 14,6:1 sul fondo, 7,3:1 sul riquadro dell'hover, doppio del verde scuro
   offered: '#ff5bd8',
   inbound: '#3CB45A',
   transferred: '#ffffff',

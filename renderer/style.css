@@ -65,6 +65,7 @@ html, body {
   --magenta: #ff5bd8;
   --traffic-yellow: #e8d45a;
   --pending-green: #3CB45A;
+  --contact-green: #2EFF55; /* voli in contatto, come sul radar (--green resta l'accento dell'interfaccia) */
 }
 
 #statusbar {
@@ -666,7 +667,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
   opacity: 0.35;
 }
 
-#badge-control[data-control="assumed"] { color: var(--green); border-color: var(--green); }
+#badge-control[data-control="assumed"] { color: var(--contact-green); border-color: var(--contact-green); }
 #badge-control[data-control="offered"] { color: var(--magenta); border-color: var(--magenta); }
 #badge-control[data-control="inbound"] { color: var(--pending-green); border-color: var(--pending-green); }
 #badge-control[data-control="other"] { color: #fff; border-color: rgba(255, 255, 255, 0.6); }
@@ -789,13 +790,10 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
   letter-spacing: 0.02em;
 }
 
-/* le parole del pilota: al massimo due righe, il resto sta nel tooltip e nell'etichetta */
+/* le parole del pilota, per intero: un MAYDAY si deve leggere tutto (al massimo tre messaggi alla volta) */
 .radio-msg .radio-text {
   color: var(--muted);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .radio-msg.mayday { border-color: var(--red); color: var(--red); }
@@ -946,7 +944,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 .rules ul { margin: 0; padding-left: 18px; }
 .c-yellow { color: var(--traffic-yellow); }
 .c-magenta { color: var(--magenta); }
-.c-green { color: var(--green); }
+.c-green { color: var(--contact-green); }
 .c-pending { color: var(--pending-green); }
 .c-white { color: #fff; }
 
@@ -1712,7 +1710,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 #coach-text b { color: #bfe6ff; font-weight: 600; }
 #coach-text b.c-yellow { color: var(--traffic-yellow); }
 #coach-text b.c-magenta { color: var(--magenta); }
-#coach-text b.c-green { color: var(--green); }
+#coach-text b.c-green { color: var(--contact-green); }
 #coach-text b.c-pending { color: var(--pending-green); }
 #coach-text b.c-white { color: #fff; }
 
