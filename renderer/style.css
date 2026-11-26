@@ -64,6 +64,7 @@ html, body {
 :root {
   --magenta: #ff5bd8;
   --traffic-yellow: #e8d45a;
+  --pending-green: #47804d;
 }
 
 #statusbar {
@@ -667,9 +668,9 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 
 #badge-control[data-control="assumed"] { color: var(--green); border-color: var(--green); }
 #badge-control[data-control="offered"] { color: var(--magenta); border-color: var(--magenta); }
-#badge-control[data-control="inbound"],
-#badge-control[data-control="other"],
-#badge-control[data-control="transferred"] { color: var(--traffic-yellow); border-color: rgba(232, 212, 90, 0.6); }
+#badge-control[data-control="inbound"] { color: var(--pending-green); border-color: var(--pending-green); }
+#badge-control[data-control="other"] { color: var(--traffic-yellow); border-color: rgba(232, 212, 90, 0.6); }
+#badge-control[data-control="transferred"] { color: #fff; border-color: rgba(255, 255, 255, 0.6); }
 
 #transfer-box {
   background: var(--field);
@@ -946,6 +947,8 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 .c-yellow { color: var(--traffic-yellow); }
 .c-magenta { color: var(--magenta); }
 .c-green { color: var(--green); }
+.c-pending { color: var(--pending-green); }
+.c-white { color: #fff; }
 
 .sector-pane {
   display: flex;
@@ -1705,6 +1708,8 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 #coach-text b.c-yellow { color: var(--traffic-yellow); }
 #coach-text b.c-magenta { color: var(--magenta); }
 #coach-text b.c-green { color: var(--green); }
+#coach-text b.c-pending { color: var(--pending-green); }
+#coach-text b.c-white { color: #fff; }
 
 #coach-goal {
   display: flex;

@@ -191,24 +191,27 @@ export const LESSONS = [
   {
     id: 'handon',
     title: 'Prendere i voli in carico',
-    subtitle: 'Giallo, magenta, verde',
-    learned: ['I tre colori del traffico e cosa significano',
+    subtitle: 'Giallo, verde scuro, magenta, verde, bianco',
+    learned: ['I colori del traffico e cosa significano',
       'Fare l\'hand-on con un clic sul tag',
       'Leggere il piano di volo e la rotta di un volo selezionato'],
     background: 7,
     steps: [
       {
         freeze: true,
-        title: 'Tre colori, tre situazioni',
+        title: 'I colori delle tracce',
         text: `<b class="c-yellow">Giallo</b>: non è tuo. Lo vedi perché ti passa vicino, ma lo controlla
           un altro settore.<br>
+          <b class="c-pending">Verde scuro</b>: entrerà nel tuo settore, ma è ancora dell'ente precedente.<br>
           <b class="c-magenta">Magenta</b>: l'ente precedente te lo ha <b>passato</b> e aspetta che tu lo
           prenda in carico.<br>
-          <b class="c-green">Verde</b>: è <b>in contatto</b> con te. Solo su questi puoi dare istruzioni.`,
+          <b class="c-green">Verde</b>: è <b>in contatto</b> con te. Solo su questi puoi dare istruzioni.<br>
+          <b class="c-white">Bianco</b>: l'hai passato all'ente successivo. Finché quello non lo accetta il
+          nominativo resta verde; poi diventa tutto bianco.`,
       },
       {
         title: 'Un volo per te',
-        text: `Eccone uno in arrivo da un settore vicino. Appena diventa <b>magenta</b> è tuo da prendere:
+        text: `Eccone uno in arrivo da un settore vicino, in <b class="c-pending">verde scuro</b>. Appena diventa <b>magenta</b> è tuo da prendere:
           un <b>clic sul tag</b> fa l'<b>hand-on</b> e il volo passa in verde.`,
         goal: 'Aspetta che il volo diventi magenta e clicca il suo tag',
         hint: 'Il clic va sul rettangolo dell\'etichetta, non sul puntino della traccia: cliccando la traccia il tag ruota soltanto.',
@@ -439,7 +442,7 @@ export const LESSONS = [
         hint: 'Prima un clic sul tag (la traccia si cerchia), poi spazio.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => c.mem.ac?.control === 'transferred',
-        success: 'Hand-off corretto: il volo è dell\'ente successivo.',
+        success: 'Hand-off corretto: la label è bianca, col nominativo verde finché l\'ente successivo non accetta il volo; poi è tutta bianca.',
       },
       {
         freeze: true,

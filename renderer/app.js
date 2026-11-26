@@ -9,7 +9,7 @@ import {
 import { LabelPanel } from './label.js';
 import { emergencyCall } from './emergency.js';
 import { REQUEST_TAG } from './requests.js';
-import { airspace, loadSector, sectorSummary, isFraPoint, inView } from './airspace.js';
+import { airspace, loadSector, sectorSummary, isFraPoint, waypoint } from './airspace.js';
 import {
   SECTORS, DIFFICULTY, DIFFICULTY_ORDER, sectorDemand, LAYERS, LAYER_ORDER, ACC_BOUNDARY, CENTRES, CENTRE, setCentre,
 } from './sectors.js';
@@ -1172,15 +1172,28 @@ const range = (from, to, step) => {
 };
 const pad3 = (v) => String(v).padStart(3, '0');
 
-// Prossimo punto: prima quelli della rotta (fino al punto d'uscita, oltre è di altri enti), poi gli altri punti
-// FRA sulla mappa, dal più vicino.
+// Prossimo punto: solo i punti del piano di volo ancora davanti al volo, fino alla destinazione. I punti già
+// sorvolati escono dalla rotta; su prua assegnata si saltano anche quelli già passati di traverso (il volo è oltre
+// il punto rispetto al tratto che segue). Quelli oltre il punto d'uscita sono di altri enti: un diretto lì è
+// coordinato con l'ente successivo.
+function passedAbeam(ac, id, nextId) {
+  const p = waypoint(id);
+  const q = waypoint(nextId);
+  if (!p || !q) return false;
+  return (ac.x - p.x) * (q.x - p.x) + (ac.y - p.y) * (q.y - p.y) > 0;
+}
+
 function fixItems(ac) {
-  const onRoute = ac.route.slice(0, ac.exitIndex + 1).filter((id) => isFraPoint(id));
-  const others = airspace.waypoints
-    .filter((w) => isFraPoint(w.id) && !onRoute.includes(w.id) && inView(w, 40))
-    .sort((a, b) => distance(ac, a) - distance(ac, b))
-    .map((w) => w.id);
-  return [{ group: 'Rotta' }, ...onRoute, { group: 'Altri punti' }, ...others];
+  const ids = ac.route.map((id, idx) => ({ id, idx })).filter((r) => isFraPoint(r.id));
+  let first = 0;
+  while (ac.mode === 'heading' && first < ids.length - 1 && passedAbeam(ac, ids[first].id, ids[first + 1].id)) first++;
+  const ahead = ids.slice(first);
+  const limit = ac.exitIndex;
+  const inside = ahead.filter((r) => r.idx <= limit).map((r) => r.id);
+  const beyond = ahead.filter((r) => r.idx > limit).map((r) => r.id);
+  const items = [{ group: 'Piano di volo' }, ...inside];
+  if (beyond.length) items.push({ group: `Oltre ${ac.route[limit]}` }, ...beyond);
+  return items;
 }
 
 // Campi della label che si cliccano: titolo, valori (numeri, oppure {group} per un'intestazione), valore
