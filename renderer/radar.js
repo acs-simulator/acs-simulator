@@ -681,6 +681,7 @@ const TAG_TEXT_HALF_W = 48;
 const TAG_TEXT_SHIFT = 9;
 const TAG_GAP = 14;
 export const LEADER_PX = 18;
+const FRAME_COLS = 13;  // larghezza della label completa, in caratteri (campi a colonna fissa fino a 10-12)
 
 function tagRing(ac, deg) {
   const rad = (deg * Math.PI) / 180;
@@ -1050,40 +1051,48 @@ function drawAircraft(ctx, t, ac, now) {
 
   const textW = measureRows(ctx, rows);
 
-  // la quarta riga (salita o discesa) cresce dalla parte opposta alla traccia
-  // posizione delle righe: quella della label senza mouse, che cresce (riga dell'SLB) dalla parte opposta alla
-  // traccia. Col mouse sopra le righe restano ferme dove sono e i campi in più si aggiungono sotto: così il campo
-  // su cui si sta per cliccare (velocità, livello…) non si sposta sotto il cursore.
+  // Posizione: si calcola su una cornice fissa, larga quanto la label completa (FRAME_COLS colonne, gli stessi
+  // campi a colonna fissa) e alta tre righe, non sul testo del momento. Così, quando un'istruzione aggiunge o
+  // toglie campi (rateo, ALV, quarta riga), quando si apre un menu o il mouse esce dalla label, la label e la linea
+  // guida non si muovono. Le righe in più crescono dalla parte opposta alla traccia (la quarta, in salita o
+  // discesa) o sotto (quelle che compaiono col mouse sopra, così il campo su cui si sta per cliccare resta fermo).
+  // Le label VFR (marca, quota, velocità) hanno sempre la stessa larghezza e tengono la loro.
   const baseH = tagHeight();
   const h = 8 + TAG_LINE * rows.length;
   const restRows = hovered ? labelRows(ctx, ac, color, false) : rows;
   const restH = 8 + TAG_LINE * restRows.length;
   const restW = hovered ? measureRows(ctx, restRows) : textW;
+  const frameW = ac.vfr ? restW : Math.max(restW, FRAME_COLS * cwOf(ctx));
+  const boxW = Math.max(textW, frameW);
   let boxLeft;
   let boxTop;
+  let baseTop;
   if (ac.tagAngle !== null && ac.tagAngle !== undefined) {
-    // posizione fissa: il blocco di testo (senza mouse) sta a LEADER_PX dalla traccia nella direzione scelta;
-    // tagOffset si aggiorna di conseguenza, così trascinamento e deconflittatore ripartono da qui
-    const hw = (restW + 8) / 2;
-    const hh = (restH - 6) / 2;
+    // posizione fissa: la cornice sta a LEADER_PX dalla traccia nella direzione scelta; tagOffset si aggiorna di
+    // conseguenza, così trascinamento e deconflittatore ripartono da qui
+    const hw = (frameW + 8) / 2;
+    const hh = (baseH - 6) / 2;
     const { cx, cy } = fixedBlockCentre(px, py, ac.tagAngle, hw, hh);
     boxLeft = cx - hw - 3;
-    boxTop = cy - restH / 2;
-    const tagY = boxTop + baseH / 2;
+    baseTop = cy - baseH / 2;
+    const above = cy < py - 5;
+    boxTop = above ? baseTop - (restH - baseH) : baseTop;
     ac.tagOffset.x = boxLeft + TAG_W / 2 - px;
-    ac.tagOffset.y = (tagY - py < -5 ? boxTop + restH - baseH / 2 : tagY) - py;
+    ac.tagOffset.y = cy - py;
   } else {
     const tagX = px + ac.tagOffset.x;
     const tagY = py + ac.tagOffset.y;
     boxLeft = tagX - TAG_W / 2;
-    const baseTop = tagY - baseH / 2;
+    baseTop = tagY - baseH / 2;
     boxTop = ac.tagOffset.y < -5 ? baseTop - (restH - baseH) : baseTop;
   }
 
-  // linea guida dalla traccia al bordo del blocco di testo (non lo attraversa)
-  const block = { ac, x0: boxLeft + 3, x1: boxLeft + 11 + textW, y0: boxTop + 3, y1: boxTop + h - 3 };
+  // linea guida dalla traccia al bordo della cornice di base (tre righe): non lo attraversa e non cambia
+  // direzione quando la label cresce
+  const block = { ac, x0: boxLeft + 3, x1: boxLeft + 11 + boxW, y0: boxTop + 3, y1: boxTop + h - 3 };
   tagBlocks.push(block);
-  const end = edgePoint(px, py, (block.x0 + block.x1) / 2, (block.y0 + block.y1) / 2, block);
+  const base = { x0: block.x0, x1: boxLeft + 11 + frameW, y0: baseTop + 3, y1: baseTop + baseH - 3 };
+  const end = edgePoint(px, py, (base.x0 + base.x1) / 2, (base.y0 + base.y1) / 2, base);
   if (end) {
     ctx.strokeStyle = color;
     ctx.globalAlpha = tDim * 0.6;
