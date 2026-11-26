@@ -293,6 +293,10 @@
   .legend { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; max-width: 1080px; margin: 34px auto 0; text-align: left; }
   .legend p { margin: 0; color: var(--muted); font-size: 15.5px; }
   .legend b { display: block; font: 700 16px/1.3 var(--mono); margin-bottom: 4px; }
+  .gestures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; max-width: 1080px; margin: 28px auto 0; padding-top: 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: left; }
+  .gestures p { margin: 0; color: var(--muted); font-size: 15.5px; }
+  .gestures b { display: block; font: 600 12px/1.3 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); margin-bottom: 6px; }
+  .gestures-note { max-width: 1080px; margin: 18px auto 0; color: var(--muted); font-size: 13.5px; text-align: left; }
   .c-yellow { color: var(--yellow) !important; }
   .c-magenta { color: var(--magenta) !important; }
   .c-green { color: var(--contact) !important; }
@@ -423,7 +427,7 @@
   footer .legal { margin: 0; max-width: 72em; font-size: 12.5px; line-height: 1.55; }
 
   @media (max-width: 900px) {
-    .split, .legend { grid-template-columns: 1fr; }
+    .split, .legend, .gestures { grid-template-columns: 1fr; }
     .legend { gap: 16px; }
     .split.flip > :first-child { order: 0; }
     .tilt { margin: 0; }
@@ -501,17 +505,24 @@
       <span class="live">SIMULAZIONE · 8×</span>
       <div class="wrap cinema-copy">
         <h2 class="mono" data-reveal>Ogni puntino è un volo.</h2>
-        <p class="intro" data-reveal style="--d: 1">Il colore del tag ti dice di chi è.</p>
+        <p class="intro" data-reveal style="--d: 1">Il colore ti dice di chi è.</p>
       </div>
     </div>
     <div class="wrap">
       <div class="legend">
-        <p data-reveal><b class="c-white">Bianco</b>Di un altro settore, o già passato: il nome resta verde finché l'altro non lo accetta.</p>
-        <p data-reveal style="--d: 1"><b class="c-pending">Verde scuro</b>Entrerà nel tuo settore, ma è ancora di quello prima.</p>
-        <p data-reveal style="--d: 2"><b class="c-magenta">Magenta</b>Te lo stanno passando. Un clic e lo prendi.</p>
-        <p data-reveal style="--d: 3"><b class="c-green">Verde</b>È tuo. Solo a lui puoi dare istruzioni.</p>
-        <p data-reveal style="--d: 4"><b class="c-yellow">Giallo</b>Un volo VFR: aviazione generale a vista, solo marca, quota e velocità.</p>
+        <p data-reveal><b class="c-white">Bianco</b>Di un altro settore.</p>
+        <p data-reveal style="--d: 1"><b class="c-pending">Verde scuro</b>Sta per entrare nel tuo.</p>
+        <p data-reveal style="--d: 2"><b class="c-magenta">Magenta</b>Te lo passano. Un clic e lo prendi.</p>
+        <p data-reveal style="--d: 3"><b class="c-green">Verde</b>È tuo. Solo a lui dai istruzioni.</p>
+        <p data-reveal style="--d: 4"><b class="c-yellow">Giallo</b>Volo VFR. Solo da guardare.</p>
       </div>
+      <div class="gestures" aria-label="I comandi">
+        <p data-reveal><b>Clic sul nome</b>Passi il volo al settore successivo.</p>
+        <p data-reveal style="--d: 1"><b>Clic sui campi</b>Livello, velocità, prua, punto: l'ordine parte subito.</p>
+        <p data-reveal style="--d: 2"><b>Destro sul livello</b>Il vettore: dove sarà fra qualche minuto.</p>
+        <p data-reveal style="--d: 3"><b>Destro sulla velocità</b>La rotta fino a destinazione.</p>
+      </div>
+      <p class="gestures-note" data-reveal>Su Mac il clic destro è il clic con due dita. Tutto il resto lo insegna il tutorial.</p>
     </div>
   </section>
 

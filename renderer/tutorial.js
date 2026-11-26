@@ -121,7 +121,7 @@ export const LESSONS = [
     title: 'Il radar e il settore',
     subtitle: 'Che cosa stai guardando',
     learned: ['Che cos\'è un settore di ACC e dove sono i suoi confini',
-      'Come leggere una traccia, la scia e il tag',
+      'Come leggere una traccia, la scia e la label',
       'Spostare, ingrandire e ricentrare la vista'],
     background: 8,
     steps: [
@@ -164,8 +164,8 @@ export const LESSONS = [
           12 secondi: più i puntini sono distanziati, più il volo è veloce.<br><br>
           Accanto c'è il <b>tag</b> (l'etichetta) collegato da una linea guida. Questi voli sono
           <b class="c-white">bianchi</b>: non sono tuoi, li sta controllando qualcun altro.`,
-        goal: 'Passa il mouse sopra una traccia o sopra un tag',
-        hint: 'Avvicina il cursore a uno dei puntini bianchi: il tag diventa grigio e si apre con tutti i campi.',
+        goal: 'Passa il mouse sopra una traccia o sopra una label',
+        hint: 'Avvicina il cursore a uno dei puntini bianchi: la label diventa grigia e si apre con tutti i campi.',
         focus: (c) => {
           const ac = c.sim.aircraft.find((a) => a.control === 'other' && tagVisible(a));
           return ac ? { ac } : null;
@@ -193,30 +193,27 @@ export const LESSONS = [
     title: 'Prendere i voli in carico',
     subtitle: 'Bianco, verde scuro, magenta, verde, giallo',
     learned: ['I colori del traffico e cosa significano',
-      'Fare l\'hand-on con un clic sul tag',
+      'Fare l\'hand-on con un clic sulla label',
       'Leggere il piano di volo e la rotta di un volo selezionato'],
     background: 7,
     steps: [
       {
         freeze: true,
         title: 'I colori delle tracce',
-        text: `<b class="c-white">Bianco</b>: non è tuo. Lo vedi perché ti passa vicino, ma lo controlla
-          un altro settore.<br>
-          <b class="c-pending">Verde scuro</b>: entrerà nel tuo settore, ma è ancora dell'ente precedente.<br>
-          <b class="c-magenta">Magenta</b>: l'ente precedente te lo ha <b>passato</b> e aspetta che tu lo
-          prenda in carico.<br>
-          <b class="c-green">Verde</b>: è <b>in contatto</b> con te. Solo su questi puoi dare istruzioni.<br>
-          Quando lo passi all'ente successivo torna <b class="c-white">bianco</b>, ma il nominativo resta
-          verde finché quello non lo accetta.<br>
-          <b class="c-yellow">Giallo</b>: un volo <b>VFR</b> (aviazione generale a vista, squawk 7000), basso e
-          lento: ne leggi solo la marca (IABCD), la quota e la velocità. Non è mai tuo.`,
+        text: `<b class="c-white">Bianco</b>: di un altro settore. Non è tuo.<br>
+          <b class="c-pending">Verde scuro</b>: entrerà nel tuo settore, ma è ancora del settore prima.<br>
+          <b class="c-magenta">Magenta</b>: te lo stanno passando. Un clic e lo prendi.<br>
+          <b class="c-green">Verde</b>: è tuo. Solo a lui dai istruzioni, e la separazione è tua.<br>
+          <b class="c-white">Bianco</b> con il nome <b class="c-green">verde</b>: l'hai appena passato, il settore
+          successivo non l'ha ancora accettato.<br>
+          <b class="c-yellow">Giallo</b>: un volo <b>VFR</b>, aviazione generale a vista. Solo da guardare.`,
       },
       {
         title: 'Un volo per te',
         text: `Eccone uno in arrivo da un settore vicino, in <b class="c-pending">verde scuro</b>. Appena diventa <b>magenta</b> è tuo da prendere:
-          un <b>clic sul tag</b> fa l'<b>hand-on</b> e il volo passa in verde.`,
-        goal: 'Aspetta che il volo diventi magenta e clicca il suo tag',
-        hint: 'Il clic va sul rettangolo dell\'etichetta, non sul puntino della traccia: cliccando la traccia il tag ruota soltanto.',
+          un <b>clic sulla label</b> fa l'<b>hand-on</b> e il volo passa in verde.`,
+        goal: 'Aspetta che il volo diventi magenta e clicca la sua label',
+        hint: 'Il clic va sul rettangolo dell\'etichetta, non sul puntino della traccia: cliccando la traccia la label ruota soltanto.',
         arm: (c) => {
           c.mem.ac = spawnFlight(c.sim, { offerIn: 12, want: levelFlight(600) });
           if (c.mem.ac) c.api.centreOn(c.mem.ac);
@@ -231,17 +228,17 @@ export const LESSONS = [
         title: 'Adesso è tuo',
         text: (c) => `<b>${c.mem.ac?.callsign ?? 'Il volo'}</b> è verde: sei tu il responsabile della sua
           separazione finché non lo passerai all'ente successivo.<br><br>
-          Il tag è anche <b>selezionato</b>: la traccia è cerchiata. Un clic sulla mappa vuota (o <b>Esc</b>,
+          Il volo è anche <b>selezionato</b>: la traccia è cerchiata. Un clic sulla mappa vuota (o <b>Esc</b>,
           <b>Q</b> o un clic destro) deseleziona.`,
         focus: (c) => (alive(c.sim, c.mem.ac) ? { ac: c.mem.ac } : null),
       },
       {
         title: 'Guarda la rotta',
-        text: `Un <b>clic destro sulla velocità</b> scritta nel tag (su Mac clic con due dita) apre la
+        text: `Un <b>clic destro sulla velocità</b> scritta nella label (su Mac clic con due dita) apre la
           <b>traiettoria</b> in celeste fino alla destinazione: serve per capire <b>dove andrà</b>, cioè se ti
           crea problemi con qualcun altro. Un altro clic destro sulla velocità la chiude.`,
         goal: 'Clic destro sulla velocità del volo per aprirne la traiettoria',
-        hint: 'Passa il mouse sul tag verde e fai clic destro sulla velocità (terza riga, a sinistra): il punto d\'uscita è quello cerchiato sul confine.',
+        hint: 'Passa il mouse sulla label verde e fai clic destro sulla velocità (terza riga, a sinistra): il punto d\'uscita è quello cerchiato sul confine.',
         done: (c) => !!c.mem.ac?.showRoute,
       },
     ],
@@ -253,14 +250,14 @@ export const LESSONS = [
     title: 'La label integrata',
     subtitle: 'Tutto quello che l\'etichetta ti dice',
     learned: ['I campi della label da livellato e in salita o discesa',
-      'Ruotare e spostare i tag per non farli sovrapporre',
+      'Ruotare e spostare le label per non farle sovrapporre',
       'Accendere il vettore velocità'],
     background: 7,
     steps: [
       {
         freeze: true,
-        title: 'Le righe del tag',
-        text: `Su un volo <b>livellato</b> il tag ha tre righe:<br>
+        title: 'Le righe della label',
+        text: `Su un volo <b>livellato</b> la label ha tre righe:<br>
           <b>1</b> nominativo · <b>2</b> livello attuale e prossimo punto di rotta (EFX) ·
           <b>3</b> velocità e scia.<br><br>
           Col <b>mouse sopra</b> compaiono anche la prua letta da bordo (<b>HDG</b>), il livello autorizzato
@@ -274,8 +271,8 @@ export const LESSONS = [
       },
       {
         title: 'Aprilo col mouse',
-        text: `Il tag compatto serve a non riempire il radar; quando ti serve tutto, basta andarci sopra.`,
-        goal: (c) => `Tieni il mouse sul tag di ${c.mem.ac?.callsign ?? 'quel volo'} e leggi HDG, ALV e NXT`,
+        text: `La label compatta serve a non riempire il radar; quando ti serve tutto, basta andarci sopra.`,
+        goal: (c) => `Tieni il mouse sulla label di ${c.mem.ac?.callsign ?? 'quel volo'} e leggi HDG, ALV e NXT`,
         hint: 'Il riquadro diventa grigio e i campi vuoti si leggono in minuscolo (efx, nxt, xfl, coo).',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => {
@@ -284,11 +281,11 @@ export const LESSONS = [
         },
       },
       {
-        title: 'Sposta il tag',
-        text: `I tag possono coprirsi a vicenda: qui non si sistemano da soli, come su una console vera.<br>
-          Un <b>clic sulla traccia</b> ruota il tag di 45° in senso orario; puoi anche <b>trascinarlo</b> dove
-          vuoi. Nel menu <b>Tag</b> in basso, <b>Deconflitta</b> li sistema tutti una volta sola.`,
-        goal: 'Clicca sulla traccia (il puntino) per ruotare il suo tag',
+        title: 'Sposta la label',
+        text: `Le label possono coprirsi a vicenda: qui non si sistemano da sole, come su una console vera.<br>
+          Un <b>clic sulla traccia</b> ruota la label di 45° in senso orario; puoi anche <b>trascinarla</b> dove
+          vuoi. Nel menu <b>Tag</b> in basso, <b>Deconflitta</b> le sistema tutte una volta sola.`,
+        goal: 'Clicca sulla traccia (il puntino) per ruotare la sua label',
         hint: 'Il bersaglio è il puntino della posizione, non l\'etichetta.',
         arm: (c) => { c.mem.angle = c.mem.ac?.tagAngle ?? null; return true; },
         focus: (c) => (alive(c.sim, c.mem.ac) ? { ac: c.mem.ac } : null),
@@ -296,11 +293,11 @@ export const LESSONS = [
       },
       {
         title: 'Il vettore velocità',
-        text: `Un <b>clic destro sul livello</b> attuale nel tag (su Mac clic con due dita) accende lo "spadino": la linea che mostra dove sarà il volo
+        text: `Un <b>clic destro sul livello</b> attuale nella label (su Mac clic con due dita) accende lo "spadino": la linea che mostra dove sarà il volo
           fra i minuti scelti con il cursore <b>Vettore</b> in basso. È il modo più rapido per vedere se due
           traiettorie si incrociano.`,
         goal: 'Clic destro sul livello per accendere il vettore',
-        hint: 'Clic destro (o con due dita) sul livello: le tre cifre all\'inizio della seconda riga del tag.',
+        hint: 'Clic destro (o con due dita) sul livello: le tre cifre all\'inizio della seconda riga della label.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => !!c.mem.ac?.showVector,
         success: 'Vettore acceso: si spegne con un altro clic destro sul livello.',
@@ -308,7 +305,7 @@ export const LESSONS = [
       {
         freeze: true,
         title: 'In salita o in discesa',
-        text: `Quando un volo <b>evolve</b> il tag cambia: accanto al livello compare una <b>freccia ↑↓</b> e
+        text: `Quando un volo <b>evolve</b> la label cambia: accanto al livello compare una <b>freccia ↑↓</b> e
           il <b>rateo</b> (VR, in centinaia di piedi al minuto: 15 = 1500 ft/min), e sotto il livello
           autorizzato (<b>ALV</b>).<br><br>
           Se il pilota ha impostato a bordo un livello diverso da quello che gli hai dato, compare anche
@@ -323,19 +320,19 @@ export const LESSONS = [
     id: 'clearances',
     title: 'Dare le istruzioni',
     subtitle: 'Livello, prua, diretto, velocità',
-    learned: ['Autorizzare un livello dal campo ALV del tag',
+    learned: ['Autorizzare un livello dal campo ALV della label',
       'Vettorare con HDG e far riprendere la navigazione propria',
       'Dare un diretto con EFX e assegnare una velocità'],
     background: 6,
     steps: [
       {
         freeze: true,
-        title: 'Si comanda dal tag',
+        title: 'Si comanda dalla label',
         text: `Su un volo in contatto i campi <b>ALV</b> (livello autorizzato), <b>HDG</b> (prua),
           <b>EFX</b> (prossimo punto), <b>SPD</b> (velocità) e <b>VR</b> (rateo) sono <b>cliccabili</b>: si apre
           l'elenco dei valori e scegliendone uno l'istruzione parte subito. Il pilota collaziona e la esegue.<br><br>
-          Attenzione: su un volo livellato <b>ALV</b> e <b>HDG</b> compaiono solo <b>col mouse sul tag</b>.
-          Ci si arriva così: mouse sul tag, poi clic sul campo.`,
+          Attenzione: su un volo livellato <b>ALV</b> e <b>HDG</b> compaiono solo <b>col mouse sulla label</b>.
+          Ci si arriva così: mouse sulla label, poi clic sul campo.`,
         arm: (c) => {
           c.mem.ac = spawnFlight(c.sim, { offerIn: 2, assume: true, want: levelFlight(900) });
           if (!c.mem.ac) return false;
@@ -348,23 +345,23 @@ export const LESSONS = [
       {
         title: 'Un nuovo livello',
         text: (c) => `${c.mem.ac?.callsign ?? 'Il volo'} è livellato a ${fl(c.mem.fl0 ?? 350)}. Autorizzalo a
-          un livello diverso: tieni il <b>mouse sul tag</b> e clicca <b>ALV</b>, il livello autorizzato, al
+          un livello diverso: tieni il <b>mouse sulla label</b> e clicca <b>ALV</b>, il livello autorizzato, al
           centro della terza riga.<br><br>
           Ricordati della <b>semicircolare italiana</b>: rotta 090°–269° livelli <b>dispari</b>,
           270°–089° livelli <b>pari</b>.`,
         goal: 'Clicca ALV e autorizza un altro livello',
-        hint: 'ALV è il numero di tre cifre al centro della terza riga del tag, accanto alla velocità: compare quando il mouse è sul tag. L\'elenco va di 10 in 10.',
+        hint: 'ALV è il numero di tre cifre al centro della terza riga della label, accanto alla velocità: compare quando il mouse è sulla label. L\'elenco va di 10 in 10.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => alive(c.sim, c.mem.ac) && c.mem.ac.clearedFL !== c.mem.fl0,
-        success: 'Autorizzato: guarda la freccia e il rateo (VR) comparire nel tag.',
+        success: 'Autorizzato: guarda la freccia e il rateo (VR) comparire nella label.',
       },
       {
         title: 'Vettoramento',
-        text: `Per separare due voli spesso basta una <b>prua</b>. Clicca <b>HDG</b> nel tag (compare passandoci
+        text: `Per separare due voli spesso basta una <b>prua</b>. Clicca <b>HDG</b> nella label (compare passandoci
           sopra) e scegli una prua: il volo lascia la rotta e la mantiene finché non gli dici altro. La prua
-          assegnata resta sempre scritta nel tag.`,
+          assegnata resta sempre scritta nella label.`,
         goal: 'Assegna una prua con HDG',
-        hint: 'Passa il mouse sul tag: HDG compare a destra, sulla riga del livello. L\'elenco va di 5 in 5.',
+        hint: 'Passa il mouse sulla label: HDG compare a destra, sulla riga del livello. L\'elenco va di 5 in 5.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => c.mem.ac?.mode === 'heading',
       },
@@ -385,7 +382,7 @@ export const LESSONS = [
           si parla in crociera). Serve soprattutto per <b>spaziare</b> due voli sulla stessa rotta senza
           vettorarli.`,
         goal: 'Assegna una velocità (o un Mach) con SPD',
-        hint: 'SPD è sulla terza riga del tag, a sinistra.',
+        hint: 'SPD è sulla terza riga della label, a sinistra.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => c.mem.ac?.speedMode === 'assigned',
         success: 'Velocità assegnata.',
@@ -408,7 +405,7 @@ export const LESSONS = [
         title: 'Ogni volo ha un\'uscita concordata',
         text: `Prendere in carico un volo significa impegnarsi a <b>consegnarlo</b> come è stato coordinato:
           in un <b>punto</b> preciso e a un <b>livello</b> preciso.<br><br>
-          Col mouse sul tag, <b>NXT</b> è l'ente successivo e <b>COO</b> il livello d'uscita dal settore.
+          Col mouse sulla label, <b>NXT</b> è l'ente successivo e <b>COO</b> il livello d'uscita dal settore.
           Se il livello che hai autorizzato non rispetta il COO, il COO diventa <b>arancione</b>.`,
         arm: (c) => {
           c.mem.ac = spawnFlight(c.sim, { offerIn: 2, assume: true, want: levelFlight(420) });
@@ -438,16 +435,15 @@ export const LESSONS = [
       },
       {
         title: 'Passalo',
-        text: `Un <b>clic sul nominativo</b> è l'hand-off (oppure seleziona il volo e premi la <b>barra
-          spaziatrice</b>). Finché il settore successivo non lo accetta il nominativo resta verde: un altro clic
-          lì e il volo torna tuo; dopo, serve il tasto <b>T</b>.<br>
-          Si fa <b>poco prima</b> del confine, non dopo: un volo che esce dal settore ancora in contatto con te
-          è un <b>errore</b>, come passarlo a un livello diverso da quello richiesto.`,
+        text: `Per passarlo basta un <b>clic sul nominativo</b> (o la <b>barra spaziatrice</b> sul volo
+          selezionato). Ripensamento? Finché il nome è verde, un altro clic lo riprende.<br>
+          Si passa <b>poco prima</b> del confine e al livello richiesto: uscire ancora in contatto, o a un altro
+          livello, è un <b>errore</b>.`,
         goal: 'Clic sul nominativo del volo per passarlo',
-        hint: 'Un clic proprio sul nominativo scritto nella prima riga del tag.',
+        hint: 'Un clic proprio sul nominativo scritto nella prima riga della label.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => c.mem.ac?.control === 'transferred',
-        success: 'Hand-off corretto: la label è bianca, col nominativo verde finché l\'ente successivo non accetta il volo; poi è tutta bianca.',
+        success: 'Passato: la label è bianca col nome verde finché il settore successivo non lo accetta, poi tutta bianca.',
       },
       {
         freeze: true,
@@ -456,7 +452,7 @@ export const LESSONS = [
           aeroporto o salgono in crociera. Non escono da un punto: escono da un <b>livello</b>.<br><br>
           Chi <b>scende</b> sotto il tuo limite inferiore va autorizzato al <b>livello di trasferimento</b>
           (il livello valido più vicino al limite, qui <b>${fl(310)}</b>) e passato al settore inferiore
-          <b>mentre ci sta arrivando</b>. Nel tag lo leggi come <b>X310 ↓OVM</b>.`,
+          <b>mentre ci sta arrivando</b>. Nella label lo leggi come <b>X310 ↓OVM</b>.`,
         arm: (c) => {
           c.mem.dsc = spawnFlight(c.sim, { offerIn: 20, want: descending });
           if (c.mem.dsc) c.api.centreOn(c.mem.dsc);
@@ -470,16 +466,16 @@ export const LESSONS = [
           const ac = c.mem.dsc;
           return `<b>${ac?.callsign ?? 'Questo volo'}</b> è in discesa verso ${ac?.destination ?? 'la sua destinazione'}:
             deve lasciarti a <b>${fl(ac?.requestedExitFL ?? 310)}</b> per <b>${ac?.nextUnit ?? 'il settore inferiore'}</b>.<br>
-            Fai l'hand-on e autorizzalo a quel livello: mouse sul tag, poi clic su <b>ALV</b>.`;
+            Fai l'hand-on e autorizzalo a quel livello: mouse sulla label, poi clic su <b>ALV</b>.`;
         },
         goal: (c) => `Hand-on e autorizzazione a ${fl(c.mem.dsc?.requestedExitFL ?? 310)}`,
-        hint: 'Prima un clic sul tag magenta; poi, col mouse sul tag, un clic su ALV e scegli il valore d\'uscita.',
+        hint: 'Prima un clic sulla label magenta; poi, col mouse sulla label, un clic su ALV e scegli il valore d\'uscita.',
         focus: (c) => (alive(c.sim, c.mem.dsc) ? { tag: c.mem.dsc } : null),
         done: (c) => c.mem.dsc?.control === 'assumed' && c.mem.dsc.clearedFL === c.mem.dsc.requestedExitFL,
       },
       {
         title: 'Passalo mentre scende',
-        text: `Quando mancano meno di <b>2000 ft</b> al livello di trasferimento il <b>livello nel tag diventa
+        text: `Quando mancano meno di <b>2000 ft</b> al livello di trasferimento il <b>livello nella label diventa
           arancione</b>: è il momento dell'hand-off. Non aspettare che si livelli, e non aspettare il confine:
           qui si passa <b>in verticale</b>.`,
         goal: 'Aspetta il livello arancione e clicca il nominativo',
@@ -538,7 +534,7 @@ export const LESSONS = [
         text: `Il settore vicino ti sta passando un volo che incrocia uno dei tuoi. Hai qualche minuto per
           accorgertene: prendilo in carico e guarda dove va.`,
         goal: 'Prendi in carico il traffico magenta',
-        hint: 'Clic sul tag magenta. Se non lo vedi, è appena fuori dal confine.',
+        hint: 'Clic sulla label magenta. Se non lo vedi, è appena fuori dal confine.',
         arm: (c) => {
           const sim = c.sim;
           // il conflitto lo costruisce la simulazione stessa (stesso meccanismo delle sessioni normali):
@@ -648,8 +644,8 @@ export const LESSONS = [
         text: `Quando rotta e livello autorizzato portano un tuo volo dentro una zona attiva, accanto al
           nominativo compare un <b>asterisco rosso</b>: cliccandolo vedi dove e quando ci entrerebbe, e la zona
           diventa rossa.`,
-        goal: 'Prendi in carico il volo e trova l\'asterisco rosso nel tag',
-        hint: 'Clic sul tag magenta per l\'hand-on; l\'asterisco è subito dopo il nominativo.',
+        goal: 'Prendi in carico il volo e trova l\'asterisco rosso nella label',
+        hint: 'Clic sulla label magenta per l\'hand-on; l\'asterisco è subito dopo il nominativo.',
         arm: (c) => {
           const sim = c.sim;
           const rel = airspace.areas.filter((a) => sim.relevantAreas.has(a.id));
@@ -723,10 +719,10 @@ export const LESSONS = [
       {
         title: 'La richiesta',
         text: (c) => `<b>${c.mem.ac?.callsign ?? 'Il volo'}</b> ha una cella sulla rotta e sta per chiederti
-          una deviazione. La sua chiamata compare fra i <b>messaggi dei piloti</b>, in alto a destra, e nel tag
+          una deviazione. La sua chiamata compare fra i <b>messaggi dei piloti</b>, in alto a destra, e nella label
           appare <b>REQ WX</b>.<br><br>
           Autorizzala dandogli la <b>prua che ha chiesto</b> (o un'altra che lo tenga fuori dalla cella):
-          clicca <b>HDG</b> nel tag.`,
+          clicca <b>HDG</b> nella label.`,
         goal: 'Aspetta la richiesta e autorizza la deviazione',
         hint: 'La prua chiesta è scritta nel messaggio del pilota: dagliela con HDG, o un diretto che aggiri la cella.',
         arm: (c) => {
@@ -777,7 +773,7 @@ export const LESSONS = [
           per consumare meno, più basso per uscire da una zona di <b>turbolenza</b> riportata da un altro volo.<br><br>
           Qualunque livello tu dia chiude la richiesta. Puoi anche negarlo: basta non rispondere, e dopo un po'
           il pilota mantiene.`,
-        goal: 'Aspetta la richiesta di livello e rispondi con ALV (mouse sul tag, poi clic sul valore)',
+        goal: 'Aspetta la richiesta di livello e rispondi con ALV (mouse sulla label, poi clic sul valore)',
         hint: 'Controlla prima che il livello che dai non crei un conflitto con un altro volo.',
         arm: (c) => {
           const sim = c.sim;
@@ -835,7 +831,7 @@ export const LESSONS = [
       },
       {
         title: 'La chiamata',
-        text: `Ascolta: la chiamata del pilota resta <b>in alto a destra</b> finché il volo è tuo, e nel tag
+        text: `Ascolta: la chiamata del pilota resta <b>in alto a destra</b> finché il volo è tuo, e nella label
           compare la sigla dell'avaria. Leggila tutta: dice <b>cosa</b> è successo, <b>che livello</b> vuole e
           se vuole <b>dirottare</b> su un altro aeroporto.`,
         arm: (c) => {
@@ -850,16 +846,16 @@ export const LESSONS = [
         focus: () => ({ dom: '#radio-msgs' }),
         done: (c) => c.api.selected() === c.mem.ac,
         goal: 'Seleziona il volo in emergenza',
-        hint: 'Un clic sul suo tag, oppure un clic sul messaggio del pilota in alto a destra.',
+        hint: 'Un clic sulla sua label, oppure un clic sul messaggio del pilota in alto a destra.',
       },
       {
         title: 'Dagli quello che chiede',
         text: (c) => `Autorizza subito la <b>discesa</b> al livello che ha chiesto
-          (${fl(c.mem.e?.targetFL ?? 140)}): mouse sul tag, poi clic su <b>ALV</b>.<br><br>
+          (${fl(c.mem.e?.targetFL ?? 140)}): mouse sulla label, poi clic su <b>ALV</b>.<br><br>
           Non aspettare di aver sistemato gli altri voli: prima l'autorizzazione, poi il resto del traffico si
           sposta attorno a lui. Se non rispondi, un'avaria grave <b>scende lo stesso</b>, senza autorizzazione.`,
         goal: (c) => `Autorizza la discesa a ${fl(c.mem.e?.targetFL ?? 140)} o più in basso`,
-        hint: 'ALV è il livello autorizzato, al centro della terza riga del tag; in discesa è già sempre visibile.',
+        hint: 'ALV è il livello autorizzato, al centro della terza riga della label; in discesa è già sempre visibile.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => c.mem.ac?.emergency?.phase === 'cleared' || c.mem.ac?.emergency?.phase === 'own',
         success: 'Discesa autorizzata.',
@@ -1316,7 +1312,7 @@ export class Tutorial {
     }
     const coach = {
       missed: 'Il volo è uscito dal settore mentre era ancora in contatto con te: l\'hand-off va fatto poco prima del confine.',
-      handoff: 'Hand-off al livello sbagliato: il livello d\'uscita è quello che leggi come COO nel tag.',
+      handoff: 'Hand-off al livello sbagliato: il livello d\'uscita è quello che leggi come COO nella label.',
       offpoint: 'Il volo è uscito lontano dal suo punto di coordinamento: rimettilo in rotta prima del confine.',
       'area-infringement': 'Sei entrato in una zona attiva: vanno aggirate o scavalcate.',
     };
