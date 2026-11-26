@@ -44,6 +44,7 @@
     --yellow: #ffd75e;
     --orange: #ffb84d;
     --magenta: #ff5bd8;
+    --pending: #47804d;
     --btn: #1d3347;
     --edge-light: #4a6d88;
     --edge-dark: #02060a;
@@ -288,12 +289,14 @@
     border: 1px solid rgba(124, 252, 154, 0.4);
   }
   .cinema .live::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--green); }
-  .legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; max-width: 1080px; margin: 34px auto 0; text-align: left; }
+  .legend { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; max-width: 1080px; margin: 34px auto 0; text-align: left; }
   .legend p { margin: 0; color: var(--muted); font-size: 15.5px; }
   .legend b { display: block; font: 700 16px/1.3 var(--mono); margin-bottom: 4px; }
   .c-yellow { color: var(--yellow) !important; }
   .c-magenta { color: var(--magenta) !important; }
   .c-green { color: var(--green) !important; }
+  .c-pending { color: var(--pending) !important; }
+  .c-white { color: #fff !important; }
 
   /* flat (telefono, movimento ridotto): foto in alto, testo sotto, niente pulviscolo né radio */
   .flat .hero { display: block; min-height: 0; }
@@ -503,8 +506,10 @@
     <div class="wrap">
       <div class="legend">
         <p data-reveal><b class="c-yellow">Giallo</b>Di un altro settore. Passa vicino, ma non è tuo.</p>
-        <p data-reveal style="--d: 1"><b class="c-magenta">Magenta</b>Te lo stanno passando. Un clic e lo prendi.</p>
-        <p data-reveal style="--d: 2"><b class="c-green">Verde</b>È tuo. Solo a lui puoi dare istruzioni.</p>
+        <p data-reveal style="--d: 1"><b class="c-pending">Verde scuro</b>Entrerà nel tuo settore, ma è ancora di quello prima.</p>
+        <p data-reveal style="--d: 2"><b class="c-magenta">Magenta</b>Te lo stanno passando. Un clic e lo prendi.</p>
+        <p data-reveal style="--d: 3"><b class="c-green">Verde</b>È tuo. Solo a lui puoi dare istruzioni.</p>
+        <p data-reveal style="--d: 4"><b class="c-white">Bianco</b>L'hai passato. Il nome resta verde finché l'altro settore non lo accetta.</p>
       </div>
     </div>
   </section>
