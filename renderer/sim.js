@@ -877,7 +877,7 @@ export class Simulation {
     // modalita' guidata (tutorial): il traffico non viene generato da solo, lo decide la lezione.
     // Resta tutto il resto: profili, coordinamento, allarmi, zone e meteo.
     this.scripted = !!settings.scripted;
-    // traffico VFR di contorno (giallo, solo quota e velocità): non entra nella separazione né nel carico
+    // traffico VFR di contorno (giallo: marca, quota e velocità): non entra nella separazione né nel carico
     this._vfr = new VfrTraffic();
 
     this.strikes = [];       // errori di coordinamento: {callsign, reason}

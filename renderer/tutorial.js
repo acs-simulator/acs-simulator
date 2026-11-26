@@ -209,7 +209,7 @@ export const LESSONS = [
           Quando lo passi all'ente successivo torna <b class="c-white">bianco</b>, ma il nominativo resta
           verde finché quello non lo accetta.<br>
           <b class="c-yellow">Giallo</b>: un volo <b>VFR</b> (aviazione generale a vista, squawk 7000), basso e
-          lento: ne leggi solo quota e velocità. Non è mai tuo.`,
+          lento: ne leggi solo la marca (IABCD), la quota e la velocità. Non è mai tuo.`,
       },
       {
         title: 'Un volo per te',
