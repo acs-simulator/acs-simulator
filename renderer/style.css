@@ -1401,6 +1401,50 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
   margin-bottom: 5px;
 }
 
+/* colori, gesti e tasti: a sinistra cosa vedi o cosa fai, a destra cosa significa */
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.help-table td {
+  padding: 5px 0;
+  vertical-align: top;
+  border-top: 1px solid var(--line-soft);
+  color: rgba(215, 230, 234, 0.85);
+}
+
+.help-table tr:first-child td { border-top: none; }
+
+.help-table td:first-child {
+  width: 34%;
+  padding-right: 14px;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.help-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.help-body kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  font: 600 11.5px/1.4 var(--mono);
+  text-align: center;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.c-red { color: var(--red); }
+
 /* --- strumenti del radar (in basso a sinistra) --- */
 
 #radar-tools {
