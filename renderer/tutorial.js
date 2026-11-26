@@ -438,7 +438,8 @@ export const LESSONS = [
         text: `Per passarlo basta un <b>clic sul nominativo</b> (o la <b>barra spaziatrice</b> sul volo
           selezionato). Ripensamento? Finché il nome è verde, un altro clic lo riprende.<br>
           Si passa <b>poco prima</b> del confine e al livello richiesto: uscire ancora in contatto, o a un altro
-          livello, è un <b>errore</b>.`,
+          livello, è un <b>errore</b>. A 2 minuti dal COP il <b>livello nella label diventa arancione</b>: è il
+          momento. Vale anche per gli arrivi passati all'avvicinamento all'inizio della STAR.`,
         goal: 'Clic sul nominativo del volo per passarlo',
         hint: 'Un clic proprio sul nominativo scritto nella prima riga della label.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),

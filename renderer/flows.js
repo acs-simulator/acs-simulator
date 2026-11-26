@@ -551,11 +551,12 @@ function starExit(A, flow, profile, passage, perf, start) {
   const hi = Math.floor((A.sector.ceilingFL - 5) / 10) * 10;
   const { min, max } = flow.star.levels;
   if (min > hi || max < lo - STAR_BELOW_FL) return undefined; // livello della STAR di un altro settore
-  // livello di trasferimento: il più vicino al nostro limite inferiore che la STAR consente (limite FL105 ->
-  // FL110), mai più alto di quello a cui il volo ci viene consegnato (una STAR non si percorre in salita)
+  // livello di trasferimento: sempre il più vicino al nostro limite inferiore (FL90 con limite FL85, FL110 con
+  // limite FL105), come per le uscite dal basso, anche se la STAR pubblicata comincia più in alto (FL170-FL190
+  // su alcune STAR di Fiumicino e Pisa): sotto il settore c'è l'avvicinamento, che riceve i voli appena sopra il
+  // proprio limite. Mai più alto di quello a cui il volo ci viene consegnato (una STAR non si percorre in salita).
   const bottom = Math.ceil((A.sector.floorFL + 5) / 10) * 10;
-  let fl = Math.min(Math.max(bottom, min), Math.min(max, hi));
-  fl = Math.max(lo, Math.min(fl, Math.floor(start.ft / 1000) * 10));
+  const fl = Math.max(lo, Math.min(bottom, Math.floor(start.ft / 1000) * 10));
   if (s - passage.entry.s < MIN_INSIDE_NM) return null;
   // fino al punto iniziale il volo deve restare nel settore: niente angoli tagliati fuori e poi rientri, salvo
   // le brevi uscite da una rientranza del confine (vedi excursionEnd)
@@ -565,7 +566,10 @@ function starExit(A, flow, profile, passage, perf, start) {
     outside = pointInPolygon(p.x, p.y, A.polygon) ? 0 : outside + SAMPLE_NM;
     if (outside > EXCURSION_MAX_NM) return null;
   }
-  if (start.s + verticalDistance(profile.type, perf, start.ft, fl * 100) > s - SAMPLE_NM) return null;
+  // non fa in tempo a scendere al livello di trasferimento prima del punto iniziale (STAR pubblicate con un
+  // livello alto, come VALMA e ESINO a FL180 per Fiumicino): niente uscita sulla STAR, vale la regola generale
+  // (di solito uscita dal basso, passato all'avvicinamento mentre si avvicina allo stesso livello)
+  if (start.s + verticalDistance(profile.type, perf, start.ft, fl * 100) > s - SAMPLE_NM) return undefined;
   return {
     ...passage,
     exit: { s, kind: 'star', point: pointAlong(flow, s), alt: fl * 100, fix: iaf.id },
