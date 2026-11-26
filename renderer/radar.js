@@ -833,7 +833,7 @@ const pad = (fl) => Math.round(fl).toString().padStart(3, '0');
 // posizioni, una ogni HISTORY_S secondi: a intervalli fissi di tempo i punti di un aereo veloce sono più
 // distanziati e la scia più lunga. I punti più vecchi si rimpiccioliscono e svaniscono; se sono molto
 // ravvicinati (aereo lento) diventano più piccoli, così restano distinti. Il vettore velocità (posizione prevista
-// fra radarView.vectorMin minuti con prua e velocità attuali) si accende e si spegne con un doppio clic sul
+// fra radarView.vectorMin minuti con prua e velocità attuali) si accende e si spegne con un clic sul
 // nominativo nella label.
 const SYMBOL_R = 3.3;
 const HISTORY_DOTS = 6;
@@ -1119,8 +1119,10 @@ function drawAircraft(ctx, t, ac, now) {
       if (!hovered) ctx.strokeText(seg.text, x, y);
       ctx.fillStyle = seg.color;
       ctx.fillText(seg.text, x, y);
-      // il nominativo si può cliccare due volte per aprire il pannello delle istruzioni
+      // un clic sul nominativo accende o spegne lo spadino
       if (seg.key === 'name') tagNames.push({ ac, x0: x - 3, x1: x + seg.w + 3, y0: y - 13, y1: y + 4 });
+      // clic destro sulla velocità (su Mac clic con due dita): apre o chiude la traiettoria, per ogni volo
+      if (seg.key === 'speed' && !ac.vfr) tagSpeeds.push({ ac, x0: x - 3, x1: x + Math.max(seg.w, 3 * cwOf(ctx)) + 3, y0: y - 12, y1: y + 4 });
       // prua, prossimo punto, rateo, livello autorizzato e velocità si cliccano per cambiarli (voli in contatto)
       if (seg.key && seg.key !== 'name' && ac.control === 'assumed') {
         tagFields.push({ ac, kind: seg.key, x0: x - 3, x1: x + Math.max(seg.w, 3 * cwOf(ctx)) + 3, y0: y - 12, y1: y + 4 });
@@ -1375,7 +1377,7 @@ export function labelAt(x, y) {
   return null;
 }
 
-// Nominativi scritti sui tag: un doppio clic apre il pannello laterale delle istruzioni.
+// Nominativi scritti sui tag: un clic accende o spegne lo spadino.
 let tagNames = [];
 
 export function tagNameAt(x, y) {
@@ -1388,6 +1390,16 @@ export function tagNameAt(x, y) {
 
 // Livello e velocità scritti sui tag dei voli in contatto: un clic apre il menu per autorizzarne un altro.
 let tagFields = [];
+let tagSpeeds = [];
+
+// Volo la cui velocità è scritta sotto il punto (px CSS): il clic destro lì apre la traiettoria.
+export function speedFieldAt(x, y) {
+  for (let i = tagSpeeds.length - 1; i >= 0; i--) {
+    const f = tagSpeeds[i];
+    if (x >= f.x0 && x <= f.x1 && y >= f.y0 && y <= f.y1) return f.ac;
+  }
+  return null;
+}
 
 export function tagFieldAt(x, y) {
   for (let i = tagFields.length - 1; i >= 0; i--) {
@@ -1422,13 +1434,16 @@ export function render(ctx, canvas, sim, {
   drawWeather(ctx, t, sim);
   drawAreas(ctx, t, sim, selected, canvas.clientWidth, canvas.clientHeight);
   drawClock(ctx, sim);
-  if (selected) drawRouteLine(ctx, t, selected);
+  // traiettoria: quella aperta con il clic destro sulla velocità (una alla volta)
+  const routed = sim.aircraft.find((ac) => ac.showRoute);
+  if (routed) drawRouteLine(ctx, t, routed);
   drawPreview(ctx, t, sim, preview);
 
   // prima il traffico non in contatto, sopra quello di nostra competenza
   const order = [...sim.aircraft].sort((a, b) => rank(a) - rank(b));
   tagFields = [];
   tagNames = [];
+  tagSpeeds = [];
   tagBlocks = [];
   trackPoints = [];
   // i VFR sotto a tutto, con la stessa label (marca, quota e velocità) e lo stesso filtro dei livelli

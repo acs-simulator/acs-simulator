@@ -366,7 +366,8 @@ export class Aircraft {
     this.turbIn = null;      // zona di turbolenza in cui si trova: {id, since}
     this.wxAvoid = null;     // cella che il traffico non nostro sta aggirando da solo
     this.wxDone = null;      // ultima cella superata: non se ne richiede subito un'altra deviazione
-    this.showVector = false; // vettore velocità, acceso con un doppio clic sul nominativo della label
+    this.showVector = false; // vettore velocità (spadino), acceso e spento con un clic sul nominativo della label
+    this.showRoute = false;  // traiettoria fino a destinazione, aperta con il clic destro sulla velocità
     this.tagOffset = { x: 30, y: -30 }; // posizione del tag rispetto alla traccia (px): trascinandolo o ruotandolo
     this.tagAngle = 45; // una delle otto posizioni a linea guida fissa (gradi da nord), null se il tag è stato trascinato
 

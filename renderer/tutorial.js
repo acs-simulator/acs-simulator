@@ -231,17 +231,18 @@ export const LESSONS = [
         title: 'Adesso è tuo',
         text: (c) => `<b>${c.mem.ac?.callsign ?? 'Il volo'}</b> è verde: sei tu il responsabile della sua
           separazione finché non lo passerai all'ente successivo.<br><br>
-          Il tag è anche <b>selezionato</b>: la traccia è cerchiata e sul radar vedi la sua <b>rotta</b>
-          in celeste, con i punti che toccherà. Un clic sulla mappa vuota (o <b>Esc</b>, <b>Q</b> o un clic destro) deseleziona.`,
+          Il tag è anche <b>selezionato</b>: la traccia è cerchiata. Un clic sulla mappa vuota (o <b>Esc</b>,
+          <b>Q</b> o un clic destro) deseleziona.`,
         focus: (c) => (alive(c.sim, c.mem.ac) ? { ac: c.mem.ac } : null),
       },
       {
         title: 'Guarda la rotta',
-        text: `Se il volo non è selezionato, cliccane di nuovo il tag: la rotta celeste serve per capire
-          <b>da dove arriva e dove andrà</b>, cioè se ti crea problemi con qualcun altro.`,
-        goal: 'Tieni selezionato il volo e guarda dove esce dal settore',
-        hint: 'Clicca il tag verde: la rotta compare e il punto d\'uscita è quello cerchiato sul confine.',
-        done: (c) => c.api.selected() === c.mem.ac,
+        text: `Un <b>clic destro sulla velocità</b> scritta nel tag (su Mac clic con due dita) apre la
+          <b>traiettoria</b> in celeste fino alla destinazione: serve per capire <b>dove andrà</b>, cioè se ti
+          crea problemi con qualcun altro. Un altro clic destro sulla velocità la chiude.`,
+        goal: 'Clic destro sulla velocità del volo per aprirne la traiettoria',
+        hint: 'Passa il mouse sul tag verde e fai clic destro sulla velocità (terza riga, a sinistra): il punto d\'uscita è quello cerchiato sul confine.',
+        done: (c) => !!c.mem.ac?.showRoute,
       },
     ],
   },
@@ -295,14 +296,14 @@ export const LESSONS = [
       },
       {
         title: 'Il vettore velocità',
-        text: `Un <b>doppio clic sul nominativo</b> accende lo "spadino": la linea che mostra dove sarà il volo
+        text: `Un <b>clic sul nominativo</b> accende lo "spadino": la linea che mostra dove sarà il volo
           fra i minuti scelti con il cursore <b>Vettore</b> in basso. È il modo più rapido per vedere se due
           traiettorie si incrociano.`,
-        goal: 'Doppio clic sul nominativo per accendere il vettore',
-        hint: 'Due clic rapidi proprio sul nominativo scritto nella prima riga del tag.',
+        goal: 'Clic sul nominativo per accendere il vettore',
+        hint: 'Un clic proprio sul nominativo scritto nella prima riga del tag.',
         focus: (c) => (alive(c.sim, c.mem.ac) ? { tag: c.mem.ac } : null),
         done: (c) => !!c.mem.ac?.showVector,
-        success: 'Vettore acceso: si spegne con un altro doppio clic.',
+        success: 'Vettore acceso: si spegne con un altro clic sul nominativo.',
       },
       {
         freeze: true,
