@@ -1243,14 +1243,14 @@ const fmtMach = (m) => {
   return v >= 100 ? (v / 100).toFixed(2) : `.${String(v).padStart(2, '0')}`;
 };
 
-// Velocità: da FL250 in su in Mach (".74"), sotto in nodi. Quella letta a bordo in ciano, quella assegnata da
-// noi nel colore della label.
+// Velocità: da FL250 in su in Mach (".74"), sotto in nodi indicati (IAS), come le legge il Mode S e come si
+// assegnano. Quella letta a bordo in ciano, quella assegnata da noi nel colore della label.
 function speedField(ac, color) {
   const mach = ac.altitude >= MACH_FROM_FT;
   if (ac.speedMode === 'assigned' && fullLabel(ac)) {
-    return { text: mach ? fmtMach(ac.assignedSpeed / soundSpeedKt(ac.altitude)) : pad3(ac.assignedSpeed), color };
+    return { text: mach ? fmtMach(ac.assignedMach ?? ac.assignedSpeed / soundSpeedKt(ac.altitude)) : pad3(ac.assignedIas), color };
   }
-  return { text: mach ? fmtMach(ac.speed / soundSpeedKt(ac.altitude)) : pad3(ac.speed), color: DOWNLINK };
+  return { text: mach ? fmtMach(ac.speed / soundSpeedKt(ac.altitude)) : pad3(ac.ias), color: DOWNLINK };
 }
 
 // Righe della label, sullo schema della label integrata (colonne di un carattere):

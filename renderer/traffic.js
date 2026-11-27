@@ -5,10 +5,11 @@
 import { airspace, waypoint, insideLateral, inView, unitAt, sectorAt } from './airspace.js';
 import { levelsForTrack, topTransferFL, bottomTransferFL } from './sectors.js';
 import {
-  pickType, requestedLevels, makeProfile, profileAltitude, profileSpeed, profileTime, distanceBefore,
+  pickType, requestedLevels, makeProfile, profileAltitude, profilePhase, profileSpeed, profileTime, distanceBefore,
   sectorPassage, passageReenters, pointAlong, resolveExit, entryStart, MIN_INSIDE_NM, LEVEL_BEFORE_NM,
 } from './flows.js';
 import { bearing, distance, segmentIntersection } from './geo.js';
+import { scheduleSpeed } from './performance.js';
 
 export const OFFER_LEAD_S = 90;   // il settore precedente ci passa il traffico ~1,5 min prima dell'ingresso
 const EDGE_MAX_S = 1500;            // i voli da lontano compaiono al bordo del radar, al più 25 minuti prima dell'ingresso
@@ -217,18 +218,25 @@ function planFlight(flow, type, cruiseFL, sSpawn, perf = aircraftVariation()) {
     },
     passage,
     routeIdx,
+    climbing: profilePhase(profile, sSpawn) === 'climb',
   };
 }
 
-// Livello a cui l'ente precedente mantiene il volo prima di passarcelo.
-export function coordinatedAltitude(profileFt, clamp, entryFt) {
-  return clamp === 'descend' ? Math.max(profileFt, entryFt) : Math.min(profileFt, entryFt);
+// Livello a cui l'ente precedente mantiene il volo prima di passarcelo. Un volo che ci arriva in discesa
+// ('descend') viene fermato al livello d'ingresso, ma solo dopo la sommità del profilo: finché sta ancora salendo
+// (un decollo vicino, come Venezia per un settore di Milano) segue la sua salita, invece di trovarsi di colpo al
+// livello d'ingresso a pochi minuti dal decollo.
+export function coordinatedAltitude(profileFt, clamp, entryFt, climbing = false) {
+  if (clamp === 'descend') return climbing ? profileFt : Math.max(profileFt, entryFt);
+  return Math.min(profileFt, entryFt);
 }
 
 function inboundPlan(planned, coord) {
   const { base } = planned;
-  const ft = coordinatedAltitude(base.altitude, coord.clamp, coord.entryFt);
-  return { ...base, ...coord, control: 'inbound', altitude: ft, assignedAltitude: ft };
+  const ft = coordinatedAltitude(base.altitude, coord.clamp, coord.entryFt, planned.climbing);
+  // trattenuto a un livello diverso da quello del profilo: livellato, con la velocità propria di quella quota
+  const speed = ft === base.altitude ? base.speed : scheduleSpeed(base.type, ft, 'cruise') * base.perf.speed;
+  return { ...base, ...coord, control: 'inbound', altitude: ft, assignedAltitude: ft, speed };
 }
 
 const COORD_KEYS = [

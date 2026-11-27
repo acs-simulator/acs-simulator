@@ -8,7 +8,10 @@ import {
   makeOursPlan, makeOtherPlan, advancePlan, conflictCandidates, shuffle, routeLengthNm, coordinatedAltitude,
   OFFER_LEAD_S,
 } from './traffic.js';
-import { climbRate, descentRate, scheduleSpeed, speedEnvelope, turnRate, soundSpeedKt } from './performance.js';
+import {
+  climbRate, descentRate, scheduleSpeed, speedEnvelope, casEnvelope, turnRate, soundSpeedKt, casToTas, tasToCas,
+  MACH_FROM_FT,
+} from './performance.js';
 import {
   makeAreaSchedule, isActiveAt, areaContains, areaTooClose, isAreaRelevant, areaBand, currentOrNextWindow, APW_S,
 } from './areas.js';
@@ -340,6 +343,7 @@ export class Aircraft {
     this.assignedSpeed = plan.speed;
     this.speedMode = 'own'; // 'own': programma di velocità del tipo | 'assigned': velocità assegnata
     this.assignedMach = null; // Mach assegnato in quota (la velocità assegnata ne deriva)
+    this.assignedCas = null;  // velocità indicata assegnata (kt): il volo la mantiene anche salendo o scendendo
     this.assignedAltitude = plan.assignedAltitude ?? plan.altitude;
     // dati letti da bordo per la label: rateo verticale (ft/min) e livello selezionato dal pilota (SLB), che
     // segue il livello autorizzato dopo il tempo di collazione e impostazione
@@ -541,29 +545,60 @@ export class Aircraft {
     return true;
   }
 
-  // Velocità vera assegnata, limitata alle prestazioni del tipo alla quota attuale. Restituisce quella applicata.
+  // Velocità indicata (nodi): quella del pannello di bordo, letta via Mode S e assegnata dal controllore sotto FL250.
+  get ias() {
+    return tasToCas(this.speed, this.altitude);
+  }
+
+  // Velocità indicata assegnata (o quella a cui corrisponde la velocità vera richiesta, se non è indicata).
+  get assignedIas() {
+    return this.assignedCas ?? tasToCas(this.assignedSpeed, this.altitude);
+  }
+
+  // Velocità indicata assegnata (nodi, come nella fraseologia: "reduce speed 250 knots"), limitata alle prestazioni
+  // del tipo alla quota attuale. Il volo la mantiene salendo o scendendo, quindi la velocità vera cambia con la quota.
+  // Restituisce quella applicata.
   setSpeed(kt) {
-    if (this.noRadio) return this.assignedSpeed;
-    const { min, max } = speedEnvelope(this.type, this.altitude);
+    if (this.noRadio) return Math.round(this.assignedIas);
+    const { min, max } = casEnvelope(this.type, this.altitude);
     this.speedMode = 'assigned';
     this.assignedMach = null;
-    this.assignedSpeed = Math.round(Math.max(min, Math.min(max, kt)));
-    return this.assignedSpeed;
+    this.assignedCas = Math.round(Math.max(min, Math.min(max, kt)));
+    this.assignedSpeed = casToTas(this.assignedCas, this.altitude);
+    return this.assignedCas;
   }
 
   // Mach assegnato (in quota): il volo lo mantiene anche cambiando livello, quindi la velocità vera segue la
   // temperatura. Restituisce il Mach applicato, limitato alle prestazioni del tipo alla quota attuale.
   setMach(mach) {
     if (this.noRadio) return null;
-    const applied = this.setSpeed(mach * soundSpeedKt(this.altitude)) / soundSpeedKt(this.altitude);
-    this.assignedMach = Math.round(applied * 100) / 100;
+    const a = soundSpeedKt(this.altitude);
+    const { min, max } = speedEnvelope(this.type, this.altitude);
+    const tas = Math.max(min, Math.min(max, mach * a));
+    this.speedMode = 'assigned';
+    this.assignedCas = null;
+    this.assignedMach = Math.round((tas / a) * 100) / 100;
+    this.assignedSpeed = this.assignedMach * a;
     return this.assignedMach;
+  }
+
+  // Mantiene la velocità attuale: indicata sotto FL250, Mach da FL250 in su (avaria radio, istruzioni degli altri enti).
+  holdCurrentSpeed() {
+    this.speedMode = 'assigned';
+    if (this.altitude >= MACH_FROM_FT) {
+      this.assignedCas = null;
+      this.assignedMach = Math.round((this.speed / soundSpeedKt(this.altitude)) * 100) / 100;
+    } else {
+      this.assignedMach = null;
+      this.assignedCas = Math.round(this.ias);
+    }
   }
 
   resumeOwnSpeed() {
     if (this.noRadio) return;
     this.speedMode = 'own';
     this.assignedMach = null;
+    this.assignedCas = null;
   }
 
   setFlightLevel(fl) {
@@ -623,6 +658,9 @@ export class Aircraft {
         * this.perf.speed * (this.emergency?.perf.speed ?? 1);
     } else if (this.assignedMach) {
       this.assignedSpeed = this.assignedMach * soundSpeedKt(this.altitude);
+    } else if (this.assignedCas != null) {
+      // velocità indicata costante: salendo la vera cresce, ma il Mach non supera il limite del tipo
+      this.assignedSpeed = Math.min(casToTas(this.assignedCas, this.altitude), (this.type.mach + 0.04) * soundSpeedKt(this.altitude));
     }
     const speedDiff = this.assignedSpeed - this.speed;
     const maxAccel = ACCEL_KT_S * dt;
@@ -666,8 +704,9 @@ function ghostExcursion(g) {
 
 // Livello a cui l'ente precedente tiene il volo finché non ce lo passa (profilo fermato al livello coordinato).
 function inboundAltitude(ac) {
-  const profileFt = Math.round(profileAltitude(ac.profile, ac._along ?? ac.alongTrackNm()) / 100) * 100;
-  return coordinatedAltitude(profileFt, ac.clamp, ac.entryFt);
+  const along = ac._along ?? ac.alongTrackNm();
+  const profileFt = Math.round(profileAltitude(ac.profile, along) / 100) * 100;
+  return coordinatedAltitude(profileFt, ac.clamp, ac.entryFt, profilePhase(ac.profile, along) === 'climb');
 }
 
 // Livello del volo dopo il trasferimento. Uscita dall'alto: il settore superiore continua subito la salita
@@ -685,7 +724,12 @@ function transferredAltitude(ac, profileFt, phase) {
   if (ac.exitKind === 'top') {
     return phase === 'descent' ? Math.min(ac.assignedAltitude, profileFt) : Math.max(ac.assignedAltitude, ac.profile.cruiseFt);
   }
-  if (ac.exitKind === 'bottom') return Math.min(ac.assignedAltitude, profileFt, airspace.floorFt - TRANSFER_BELOW_FT);
+  // al livello intero almeno TRANSFER_BELOW_FT sotto il nostro limite: con limiti come FL305 o FL195 la sola
+  // differenza darebbe FL285 o FL175, livelli che non esistono
+  if (ac.exitKind === 'bottom') {
+    const below = Math.floor((airspace.floorFt - TRANSFER_BELOW_FT) / 1000) * 1000;
+    return Math.min(ac.assignedAltitude, profileFt, below);
+  }
   // passato all'avvicinamento sul punto iniziale della STAR: scende lungo la STAR secondo il profilo
   if (ac.exitKind === 'star') return Math.min(ac.assignedAltitude, profileFt);
   if (insideLateral(ac)) return ac.assignedAltitude;
@@ -708,6 +752,7 @@ function radioFailureStep(ac, holdLeftS, profileFt, phase) {
   }
   ac.speedMode = 'own';
   ac.assignedMach = null;
+  ac.assignedCas = null;
   const rflFt = Math.min(ac.rfl ?? ac.clearedFL, ac.type.maxFL) * 100;
   // il profilo è già in discesa: scende con lui; altrimenti sale o scende al livello del piano di volo
   ac.assignedAltitude = phase === 'descent' ? Math.min(ac.assignedAltitude, rflFt, profileFt) : rflFt;
@@ -755,9 +800,11 @@ function applyResolution(ac) {
   if (r.capFt != null) ac.assignedAltitude = Math.min(ac.assignedAltitude, r.capFt);
   if (r.floorFt != null) ac.assignedAltitude = Math.max(ac.assignedAltitude, r.floorFt);
   if (r.speedKt != null) {
+    // velocità indicata: l'ente che la assegna la fa mantenere anche in salita o in discesa
     ac.speedMode = 'assigned';
     ac.assignedMach = null;
-    ac.assignedSpeed = r.speedKt;
+    ac.assignedCas = r.speedKt;
+    ac.assignedSpeed = casToTas(r.speedKt, ac.altitude);
   }
 }
 
@@ -2244,7 +2291,7 @@ export class Simulation {
       applyResolution(ac);
     } else if (ac.control === 'inbound' || ac.control === 'offered') {
       // l'ente precedente mantiene il volo sul livello coordinato
-      ac.assignedAltitude = coordinatedAltitude(profileFt, ac.clamp, ac.entryFt);
+      ac.assignedAltitude = coordinatedAltitude(profileFt, ac.clamp, ac.entryFt, profilePhase(ac.profile, ac.profileS) === 'climb');
       applyResolution(ac);
       if (ac.control === 'inbound' && this._offerDue(ac, inside, s)) {
         ac.control = 'offered';
@@ -2609,7 +2656,7 @@ export class Simulation {
   _release(ac, tracks, free = null) {
     const r = ac.resolution;
     // la velocità torna quella propria, a meno che nel frattempo non l'abbia cambiata il controllore
-    if (r?.speedKt != null && ac.speedMode === 'assigned' && ac.assignedSpeed === r.speedKt) ac.speedMode = 'own';
+    if (r?.speedKt != null && ac.speedMode === 'assigned' && ac.assignedCas === r.speedKt) ac.resumeOwnSpeed();
     ac.resolution = null;
     tracks.set(ac, free ?? this._resolveTrack(ac, null));
   }
@@ -2654,10 +2701,11 @@ export class Simulation {
     if (goingDown && here <= top) add({ floorFt: here }, 1500, true);
     // velocità: più lento (per passare dietro o restare in scia) o più veloce (per passare davanti)
     const { min, max } = speedEnvelope(m.type, m.altitude);
-    const slow = Math.round(Math.max(min, m.speed - 40));
-    const fast = Math.round(Math.min(max, m.speed + 30));
-    if (slow < m.speed - 15) options.push({ speedKt: slow, cost: 4000 });
-    if (fast > m.speed + 15) options.push({ speedKt: fast, cost: 4500 });
+    const slow = Math.max(min, m.speed - 40);
+    const fast = Math.min(max, m.speed + 30);
+    // la velocità si assegna indicata (speedKt), calcolata sulla vera alla quota attuale
+    if (slow < m.speed - 15) options.push({ speedKt: Math.round(tasToCas(slow, m.altitude)), cost: 4000 });
+    if (fast > m.speed + 15) options.push({ speedKt: Math.round(tasToCas(fast, m.altitude)), cost: 4500 });
     // l'ente precedente non ci consegna il volo fuori dalla fascia del settore
     const fits = (o) => m.control !== 'inbound'
       || ((o.capFt == null || o.capFt >= airspace.floorFt) && (o.floorFt == null || o.floorFt < airspace.ceilingFt));
@@ -2696,8 +2744,9 @@ export class Simulation {
 
   _apply(m, resolution, track, tracks) {
     const old = m.resolution;
-    if (old?.speedKt != null && resolution.speedKt == null && m.speedMode === 'assigned' && m.assignedSpeed === old.speedKt) {
+    if (old?.speedKt != null && resolution.speedKt == null && m.speedMode === 'assigned' && m.assignedCas === old.speedKt) {
       m.speedMode = 'own';
+      m.assignedCas = null;
     }
     // l'istruzione si applica a ogni passo in _updateControl (per un volo appena passato, dopo TAKEOVER_S)
     m.resolution = resolution;

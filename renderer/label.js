@@ -2,7 +2,7 @@ import { airspace, waypoint, inView, insideLateral, isFraPoint } from './airspac
 import { predictConflicts, SEP_HORIZONTAL_NM, SEP_VERTICAL_FT, STCA_S } from './sim.js';
 import { isSemicircularLevel, isSouthbound } from './sectors.js';
 import { angleDiff, bearing, distance, normalizeDeg } from './geo.js';
-import { speedEnvelope } from './performance.js';
+import { casEnvelope } from './performance.js';
 import { emergencyCall, emergencyStatus } from './emergency.js';
 import { requestStatus, REQUEST_LABEL } from './requests.js';
 import { areaBand } from './areas.js';
@@ -326,16 +326,17 @@ export class LabelPanel {
 
   _refreshSpeed(ac) {
     const el = this.el;
-    const diff = ac.assignedSpeed - ac.speed;
+    // velocità indicate (IAS), come si assegnano
+    const diff = ac.assignedIas - ac.ias;
     const trend = Math.abs(diff) >= 2 ? (diff > 0 ? ' ▲' : ' ▼') : '';
     const own = ac.speedMode === 'own';
-    el.spdCurrent.textContent = `${Math.round(ac.speed)}`;
+    el.spdCurrent.textContent = `${Math.round(ac.ias)}`;
     el.spdTargetLabel.textContent = own ? 'Propria' : 'Assegnata';
-    el.spdTarget.textContent = `${Math.round(ac.assignedSpeed)}${trend}`;
-    const { min, max } = speedEnvelope(ac.type, ac.altitude);
-    el.spdHint.textContent = `${own ? 'Programma del pilota' : 'Velocità assegnata'} · a ${fmtFl(ac.flightLevel)} assegnabile ${min}–${max} kt`;
+    el.spdTarget.textContent = `${Math.round(ac.assignedIas)}${trend}`;
+    const { min, max } = casEnvelope(ac.type, ac.altitude);
+    el.spdHint.textContent = `${own ? 'Programma del pilota' : 'Velocità assegnata'} · a ${fmtFl(ac.flightLevel)} assegnabile ${min}–${max} kt indicati`;
     el.resumeSpeed.disabled = own;
-    this._syncField('speed', Math.round(ac.assignedSpeed));
+    this._syncField('speed', Math.round(ac.assignedIas));
   }
 
   _refreshLevel(ac) {

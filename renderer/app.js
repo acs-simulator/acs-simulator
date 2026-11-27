@@ -1200,8 +1200,9 @@ const TAG_MENUS = {
   fl: { title: 'ALV', items: () => range(450, 50, -10), current: (ac) => ac.clearedFL, format: pad3 },
   speed: {
     title: 'SPD',
-    items: () => range(560, 160, -10),
-    current: (ac) => Math.round(ac.speedMode === 'assigned' ? ac.assignedSpeed : ac.speed),
+    // nodi indicati, come nella fraseologia ("reduce speed 250 knots")
+    items: () => range(360, 160, -10),
+    current: (ac) => Math.round(ac.speedMode === 'assigned' ? ac.assignedIas : ac.ias),
     format: String,
   },
   heading: {
@@ -1214,7 +1215,8 @@ const TAG_MENUS = {
   mach: {
     title: 'MACH',
     items: () => range(90, 60, -1),
-    current: (ac) => Math.round(((ac.speedMode === 'assigned' ? ac.assignedSpeed : ac.speed) / soundSpeedKt(ac.altitude)) * 100),
+    current: (ac) => Math.round((ac.speedMode === 'assigned' && ac.assignedMach
+      ? ac.assignedMach : (ac.speedMode === 'assigned' ? ac.assignedSpeed : ac.speed) / soundSpeedKt(ac.altitude)) * 100),
     format: (v) => (v >= 100 ? (v / 100).toFixed(2) : `.${String(v).padStart(2, '0')}`),
   },
   rate: {

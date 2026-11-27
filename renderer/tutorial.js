@@ -378,7 +378,7 @@ export const LESSONS = [
       },
       {
         title: 'La velocità',
-        text: `<b>SPD</b> assegna la velocità: in nodi sotto FL250, in <b>Mach</b> da FL250 in su (è così che
+        text: `<b>SPD</b> assegna la velocità: in nodi indicati sotto FL250, in <b>Mach</b> da FL250 in su (è così che
           si parla in crociera). Serve soprattutto per <b>spaziare</b> due voli sulla stessa rotta senza
           vettorarli.`,
         goal: 'Assegna una velocità (o un Mach) con SPD',
