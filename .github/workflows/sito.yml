@@ -36,6 +36,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # gli stessi controlli dei pacchetti: un simulatore rotto o sbilanciato non va online
+      - run: node tools/check.mjs
       - run: node tools/build-site.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -898,7 +898,7 @@ button:hover:not(:disabled) { filter: brightness(1.25); }
 }
 
 .start-head p { margin: 0 0 6px; font-size: 13px; }
-.start-head p.small { margin: 0; font-size: 12px; opacity: 0.85; }
+.start-head p.small { margin: 0; font-size: 12px; }
 
 .start-body {
   flex: 1;
@@ -2048,7 +2048,7 @@ button, input, select, .menu, .tool-menu, .toast, .badge, .hud-cell, .area-row, 
 }
 
 .brand-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 

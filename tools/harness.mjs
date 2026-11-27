@@ -1,7 +1,9 @@
 // Banco di prova senza interfaccia: fa girare la simulazione con un "controllore automatico"
 // (hand-on appena il volo è offerto, livello d'uscita autorizzato subito, hand-off al momento giusto)
 // e misura, per ogni settore, il carico medio, le offerte orarie, i minuti di competenza per volo,
-// gli allarmi STCA, le perdite di separazione fra voli di altri enti (che quegli enti dovrebbero evitare),
+// gli allarmi STCA, i conflitti programmati consegnati (plannedPerH) e quelli che senza interventi si presentano
+// davvero (plannedRealPerH), gli arrivi offerti ancora in salita (climbingArrivals: deve restare 0),
+// le perdite di separazione fra voli di altri enti (che quegli enti dovrebbero evitare),
 // gli hand-off sbagliati o mancati e i voli che (senza vettoramenti) entrerebbero in una zona
 // attiva: allarmi di prossimità (apwPerH) e violazioni (areaPerH, di cui areaStrikes contate come errori).
 //
@@ -21,6 +23,14 @@ const { Simulation } = await import(`${R}/sim.js`);
 const { distance } = await import(`${R}/geo.js`);
 
 const DT = 2;   // passo di simulazione (s)
+
+// Orologio della misura. La ricerca dei conflitti programmati (sim.js, traffic.js) si ferma dopo qualche
+// millisecondo di calcolo, letto con performance.now: con l'orologio vero lo stesso seme dava risultati diversi a ogni
+// esecuzione, e diversi su computer diversi. Qui l'orologio avanza di un passo fisso a ogni lettura, tarato sulla
+// ricerca vera su un Mac recente (circa 20 letture per millisecondo): la misura fa lo stesso lavoro del gioco ed è
+// ripetibile. Il tempo di calcolo per passo si misura con l'orologio vero.
+const realNow = performance.now.bind(performance);
+const CLOCK_STEP_MS = 1 / 20;
 
 function nearExit(ac) {
   const fix = ac.exitFix ? waypoint(ac.exitFix) : null;
@@ -49,6 +59,16 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     rnd = (rnd * 1664525 + 1013904223) % 4294967296;
     return rnd / 4294967296;
   };
+  let fakeMs = 0;
+  performance.now = () => (fakeMs += CLOCK_STEP_MS);
+  try {
+    return run(centreId, sectorId, hours);
+  } finally {
+    performance.now = realNow;
+  }
+}
+
+function run(centreId, sectorId, hours) {
   setCentre(centreId);
   loadSector(sectorId);
   // DIFF=facile|media|difficile per misurare un'altra difficoltà (di default quella del settore)
@@ -65,6 +85,9 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
   let areaStrikes = 0;
   let emergencies = 0;
   let ownDescents = 0;
+  let climbingArrivals = 0;   // arrivi (devono scendere nel settore) offerti mentre stanno ancora salendo
+  const planned = new Map();  // voli consegnati in conflitto programmato -> bersaglio
+  let plannedReal = 0;        // ...il cui conflitto, senza interventi, si è presentato davvero (allarme STCA)
   let othersLost = 0;
   const emergencyKinds = {};
   sim.on('event', (e) => {
@@ -82,6 +105,11 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     // automatico (non separa i voli prima dell'hand-off), non degli altri enti
     if (e.type === 'loss-other' && !e.a.handedInConflict && !e.b.handedInConflict) othersLost++;
     if (e.type === 'offered') {
+      const { ac } = e;
+      const descends = ac.exitKind === 'bottom' || ac.exitKind === 'star' || ac.requestedExitFL * 100 < ac.entryFt;
+      // (chi ha deviato per un temporale può dover ancora livellare al primo livello sopra: meno di 1000 ft)
+      if (descends && ac.assignedAltitude > ac.altitude + 1000) climbingArrivals++;
+      if (ac.plannedConflict) planned.set(ac.id, ac.plannedConflict.targetId);
       offers++;
       offerTime.set(e.ac, sim.simTime);
     }
@@ -111,15 +139,17 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
         sim.handOff(ac);
       }
     }
-    const t0 = performance.now();
+    const t0 = realNow();
     sim.tick(DT);
-    tickMs = Math.max(tickMs, performance.now() - t0);
-    tickSum += performance.now() - t0;
+    const elapsed = realNow() - t0;
+    tickMs = Math.max(tickMs, elapsed);
+    tickSum += elapsed;
     for (const p of sim.stca) {
       const key = [p.a.callsign, p.b.callsign].sort().join('-');
       if (!seen.has(key)) {
         seen.add(key);
         conflicts++;
+        if (planned.get(p.a.id) === p.b.id || planned.get(p.b.id) === p.a.id) plannedReal++;
       }
     }
     loadSum += sim.aircraft.filter((a) => a.control === 'offered' || a.control === 'assumed').length;
@@ -136,6 +166,9 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     transitMin: +(mean(transits) / 60).toFixed(2),
     handoffs: transits.length,
     stcaPerH: +(conflicts / hours).toFixed(1),
+    plannedPerH: +(planned.size / hours).toFixed(1),
+    plannedRealPerH: +(plannedReal / hours).toFixed(1),
+    climbingArrivals,
     othersLostPerH: +(othersLost / hours).toFixed(2),
     resolutionsPerH: +(sim.resolutions / hours).toFixed(1),
     wrong: wrong.length,

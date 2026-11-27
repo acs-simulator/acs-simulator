@@ -31,11 +31,21 @@ export function casToTas(cas, altFt) {
   return mach * A0_KT * Math.sqrt(theta);
 }
 
+// Velocità calibrata (indicata) corrispondente a una velocità vera: l'inverso di casToTas.
+export function tasToCas(tas, altFt) {
+  const { theta, delta } = isa(altFt);
+  const mach = tas / (A0_KT * Math.sqrt(theta));
+  const qc = delta * ((1 + 0.2 * mach ** 2) ** 3.5 - 1);
+  return A0_KT * Math.sqrt(5 * ((qc + 1) ** (1 / 3.5) - 1));
+}
+
 // Velocità propria (vera) secondo il programma del tipo: velocità indicata di salita, crociera o discesa,
-// 250 kt sotto FL100, velocità ridotte vicino all'aeroporto, limite del Mach di crociera in quota.
+// 250 kt sotto FL100 (in discesa già da DECEL_FROM_FT, così il volo passa FL100 a 250 kt e non rallenta dopo),
+// velocità ridotte vicino all'aeroporto, limite del Mach di crociera in quota.
+const DECEL_FROM_FT = 13000;
 export function scheduleSpeed(type, altFt, phase = 'cruise') {
   let cas = phase === 'climb' ? type.climbCas : phase === 'descent' ? type.descentCas : type.cruiseCas;
-  if (altFt < 10000) cas = Math.min(cas, 250);
+  if (altFt < 10000 || (phase === 'descent' && altFt < DECEL_FROM_FT)) cas = Math.min(cas, 250);
   if (altFt < 5000) cas = Math.min(cas, phase === 'descent' ? 210 : 220);
   return Math.min(casToTas(cas, altFt), type.mach * soundSpeedKt(altFt));
 }
@@ -47,6 +57,13 @@ export function speedEnvelope(type, altFt) {
   const min = Math.max(casToTas(jet ? 210 : 160, altFt), own * 0.82);
   const max = Math.min(casToTas(jet ? 340 : 250, altFt), (type.mach + 0.04) * soundSpeedKt(altFt), own * 1.15);
   return { min: Math.round(min), max: Math.round(Math.max(min, max)) };
+}
+
+// Le stesse velocità assegnabili, in nodi indicati: sotto FL250 il controllore assegna la velocità indicata.
+export function casEnvelope(type, altFt) {
+  const { min, max } = speedEnvelope(type, altFt);
+  const lo = Math.ceil(tasToCas(min, altFt));
+  return { min: lo, max: Math.max(lo, Math.floor(tasToCas(max, altFt))) };
 }
 
 // Rateo di salita (ft/min): pieno a bassa quota, sempre più ridotto avvicinandosi alla tangenza.

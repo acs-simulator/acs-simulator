@@ -191,8 +191,7 @@ export function declareEmergency(ac, simTime, type = weightedType(EMERGENCY_TYPE
     // livello concordato per telefono con l'ente successivo: quello che il volo sta mantenendo
     ac.requestedExitFL = ac.clearedFL;
     // velocità: l'ultima assegnata, oppure quella che stava tenendo; da qui resta fissa (anche il Mach)
-    if (ac.speedMode !== 'assigned') ac.assignedSpeed = Math.round(ac.speed);
-    ac.speedMode = 'assigned';
+    if (ac.speedMode !== 'assigned') ac.holdCurrentSpeed();
     // livello: l'ultimo autorizzato (una salita o discesa già in corso verso di esso si completa), con il rateo
     // normale del tipo
     ac.assignedRateFpm = null;

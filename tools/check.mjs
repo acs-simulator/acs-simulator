@@ -5,7 +5,7 @@
 //   3. le lezioni della modalità guidata sono ben formate
 //   4. la simulazione è ancora in bilancio: carico nella fascia della difficoltà, nessun hand-off
 //      sbagliato dal "controllore automatico", perdite di separazione fra voli altrui rare, tempo di calcolo
-//      per passo sotto soglia
+//      per passo sotto soglia, nessun arrivo offerto in salita, conflitti programmati consegnati e reali
 //
 // Il punto 4 fa girare il banco di prova (tools/harness.mjs) con un seme fisso, quindi è ripetibile:
 // se un cambiamento sposta il bilanciamento del traffico, qui si vede.
@@ -148,7 +148,7 @@ check('lezioni ben formate', wellFormed, problem);
 
 // --- 4. bilanciamento della simulazione --------------------------------------
 
-section('Bilanciamento della simulazione (banco di prova, 2 ore per settore)');
+section('Bilanciamento della simulazione (banco di prova, 2 semi da 2 ore per settore)');
 const { measure } = await import(`${ROOT}/tools/harness.mjs`);
 const { DIFFICULTY } = await import(`${R}/sector-model.js`);
 const { CENTRES } = await import(`${R}/sectors.js`);
@@ -186,10 +186,20 @@ const tickLimit = TICK_LIMIT_MS * speed;
 console.log(`  velocità della macchina: ${speed.toFixed(2)}× più lenta del riferimento, soglia di calcolo ${tickLimit.toFixed(1)} ms`);
 
 const CASES = [['roma', 'NWA'], ['roma', 'OVB'], ['milano', CENTRES[1].sectors[0].id]];
+const SEEDS = [1, 2];
 for (const [centre, id] of CASES) {
   const sector = CENTRES.find((c) => c.id === centre).sectors.find((s) => s.id === id);
   const target = DIFFICULTY[sector.difficulty].load;
-  const r = measure(centre, id, 2, 7);
+  // due semi da due ore, in media: il banco di prova è ripetibile (stesso seme, stesso risultato), ma un seme solo
+  // può capitare su un'ora particolare (pochi conflitti programmabili, una perdita altrui in più)
+  const runs = SEEDS.map((seed) => measure(centre, id, 2, seed));
+  const mean = (k) => +(runs.reduce((sum, x) => sum + x[k], 0) / runs.length).toFixed(2);
+  const sum = (k) => runs.reduce((acc, x) => acc + x[k], 0);
+  const r = {
+    load: mean('load'), offersPerH: mean('offersPerH'), transitMin: mean('transitMin'), othersLostPerH: mean('othersLostPerH'),
+    tickMsAvg: mean('tickMsAvg'), plannedPerH: mean('plannedPerH'), plannedRealPerH: mean('plannedRealPerH'),
+    handoffs: sum('handoffs'), wrong: sum('wrong'), climbingArrivals: sum('climbingArrivals'),
+  };
   const line = `carico ${r.load} (atteso ~${target}) · offerte/h ${r.offersPerH} · passaggio ${r.transitMin} min`
     + ` · hand-off ${r.handoffs} · perdite altrui/h ${r.othersLostPerH} · tick ${r.tickMsAvg} ms`;
   console.log(`  ${centre} ${id}: ${line}`);
@@ -206,6 +216,12 @@ for (const [centre, id] of CASES) {
   check(`${id}: gli altri enti separano il loro traffico`, r.othersLostPerH <= 2.5,
     `${r.othersLostPerH} perdite di separazione all'ora fra voli non nostri (soglia 2,5)`);
   check(`${id}: calcolo fluido`, r.tickMsAvg < tickLimit, `${r.tickMsAvg} ms per passo (soglia ${tickLimit.toFixed(1)} ms)`);
+  // un volo che nel settore deve scendere non viene mai passato mentre sta ancora salendo
+  check(`${id}: nessun arrivo offerto in salita`, r.climbingArrivals === 0, `${r.climbingArrivals} arrivi offerti in salita`);
+  // i conflitti programmati vengono consegnati e, senza interventi, si presentano davvero
+  check(`${id}: conflitti programmati consegnati`, r.plannedPerH >= 2, `${r.plannedPerH} all'ora`);
+  check(`${id}: conflitti programmati reali`, r.plannedRealPerH >= r.plannedPerH * 0.6,
+    `${r.plannedRealPerH} reali su ${r.plannedPerH} consegnati all'ora`);
 }
 
 // --- esito -------------------------------------------------------------------
