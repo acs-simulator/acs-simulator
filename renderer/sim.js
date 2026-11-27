@@ -45,8 +45,12 @@ export const CONFLICT_LOOKAHEAD_S = 300; // 5 minuti
 export const MAX_STRIKES = 3;
 export const STCA_S = 60;          // allarme automatico: perdita di separazione prevista entro 1 minuto
 
+const APP_VECTOR_NM = 40;          // vicino alla destinazione l'avvicinamento allunga la strada a chi è ancora alto
+const APP_GATE_FT = 3000;          // ...facendolo scendere fino a qui prima di rimandarlo sul punto di finale
+const APP_DESCENT_SHARE = 0.8;     // ...con questa parte della pendenza di discesa possibile al tipo
 const LANDING_RADIUS_NM = 8;       // un volo in atterraggio sparisce dal radar entro questa distanza dall'aeroporto,
 const LANDING_FT = 4000;           // se è già sotto questa quota o sull'ultimo tratto della rotta
+const LANDING_FINAL_FT = 6000;     // ...sotto questa
 const MISSED_HANDOFF_GRACE_S = 30; // tolleranza fuori dal settore prima di considerare l'hand-off mancato
 const ENTRY_TOLERANCE_NM = 3;      // un volo è entrato nel settore solo da poco prima del punto d'ingresso pianificato
 const EXCURSION_TOLERANCE_NM = 3; // uscita pianificata ancora davanti di almeno così: l'uscita laterale è temporanea
@@ -209,10 +213,39 @@ function weightedKey(weights) {
   return (entries.find(([, w]) => (r -= w) <= 0) ?? entries[entries.length - 1])[0];
 }
 
+// Vento della sessione sul moto degli aerei (convenzione meteorologica: dir è la direzione da cui soffia).
+// Lo imposta la simulazione a ogni passo; in quota pieno, più debole scendendo (alla superficie un terzo).
+let sessionWind = null;   // { kt, toRad, ux, uy }: intensità in quota e versore verso cui soffia
+const WIND_FULL_FT = 30000;
+
+function setSessionWind(wind) {
+  if (!wind?.kt) {
+    sessionWind = null;
+    return;
+  }
+  if (sessionWind?.src === wind) return;
+  const to = ((wind.dir + 180) * Math.PI) / 180;   // verso cui soffia
+  sessionWind = { src: wind, kt: wind.kt, toRad: to, ux: Math.sin(to), uy: -Math.cos(to) };
+}
+
+export function windAt(altFt) {
+  if (!sessionWind) return null;
+  const kt = sessionWind.kt * (0.35 + 0.65 * Math.min(1, Math.max(0, altFt) / WIND_FULL_FT));
+  return { x: sessionWind.ux * kt, y: sessionWind.uy * kt, kt, toRad: sessionWind.toRad };
+}
+
+// Velocità al suolo (NM/s): prua e velocità vera più il vento.
 function velocityVector(ac) {
   const nmPerSec = ac.speed / 3600;
   const rad = (ac.heading * Math.PI) / 180;
-  return { x: Math.sin(rad) * nmPerSec, y: -Math.cos(rad) * nmPerSec };
+  let x = Math.sin(rad) * nmPerSec;
+  let y = -Math.cos(rad) * nmPerSec;
+  if (sessionWind) {
+    const kt = sessionWind.kt * (0.35 + 0.65 * Math.min(1, Math.max(0, ac.altitude) / WIND_FULL_FT));
+    x += (sessionWind.ux * kt) / 3600;
+    y += (sessionWind.uy * kt) / 3600;
+  }
+  return { x, y };
 }
 
 // Quota prevista fra t secondi verso la quota assegnata (poi livellato).
@@ -351,6 +384,7 @@ export class Aircraft {
     this.speedMode = 'own'; // 'own': programma di velocità del tipo | 'assigned': velocità assegnata
     this.assignedMach = null; // Mach assegnato in quota (la velocità assegnata ne deriva)
     this.assignedCas = null;  // velocità indicata assegnata (kt): il volo la mantiene anche salendo o scendendo
+    this.speedByResolution = false; // la velocità assegnata viene da un altro ente per separare (vedi applyResolution)
     this.assignedAltitude = plan.assignedAltitude ?? plan.altitude;
     // dati letti da bordo per la label: rateo verticale (ft/min) e livello selezionato dal pilota (SLB), che
     // segue il livello autorizzato dopo il tempo di collazione e impostazione
@@ -569,6 +603,7 @@ export class Aircraft {
     if (this.noRadio) return Math.round(this.assignedIas);
     const { min, max } = casEnvelope(this.type, this.altitude);
     this.speedMode = 'assigned';
+    this.speedByResolution = false;
     this.assignedMach = null;
     this.assignedCas = Math.round(Math.max(min, Math.min(max, kt)));
     this.assignedSpeed = casToTas(this.assignedCas, this.altitude);
@@ -583,6 +618,7 @@ export class Aircraft {
     const { min, max } = speedEnvelope(this.type, this.altitude);
     const tas = Math.max(min, Math.min(max, mach * a));
     this.speedMode = 'assigned';
+    this.speedByResolution = false;
     this.assignedCas = null;
     this.assignedMach = Math.round((tas / a) * 100) / 100;
     this.assignedSpeed = this.assignedMach * a;
@@ -592,6 +628,7 @@ export class Aircraft {
   // Mantiene la velocità attuale: indicata sotto FL250, Mach da FL250 in su (avaria radio, istruzioni degli altri enti).
   holdCurrentSpeed() {
     this.speedMode = 'assigned';
+    this.speedByResolution = false;
     if (this.altitude >= MACH_FROM_FT) {
       this.assignedCas = null;
       this.assignedMach = Math.round((this.speed / soundSpeedKt(this.altitude)) * 100) / 100;
@@ -604,6 +641,7 @@ export class Aircraft {
   resumeOwnSpeed() {
     if (this.noRadio) return;
     this.speedMode = 'own';
+    this.speedByResolution = false;
     this.assignedMach = null;
     this.assignedCas = null;
   }
@@ -643,9 +681,28 @@ export class Aircraft {
     if (this.mode === 'heading') return this.assignedHeading;
     if (this.route.length > 0) {
       const wp = waypoint(this.route[0]);
-      if (wp) return bearing(this, wp);
+      // sulla rotta il pilota corregge la deriva: prua tale che la rotta al suolo punti al punto
+      if (wp) return this._correctedHeading(bearing(this, wp));
     }
     return this.heading;
+  }
+
+  // Prua che dà la rotta al suolo voluta con il vento attuale (correzione di deriva).
+  _correctedHeading(track) {
+    const w = windAt(this.altitude);
+    if (!w || this.speed < 1) return track;
+    const t = (track * Math.PI) / 180;
+    const ratio = Math.max(-1, Math.min(1, (w.kt * Math.sin(w.toRad - t)) / this.speed));
+    return normalizeDeg(track - (Math.asin(ratio) * 180) / Math.PI);
+  }
+
+  // Rotta al suolo (gradi) e velocità al suolo (kt), con il vento.
+  get groundVector() {
+    const v = velocityVector(this);
+    return {
+      track: normalizeDeg((Math.atan2(v.x, -v.y) * 180) / Math.PI),
+      gs: Math.hypot(v.x, v.y) * 3600,
+    };
   }
 
   update(dt) {
@@ -661,7 +718,9 @@ export class Aircraft {
     this.heading = normalizeDeg(this.heading + Math.max(-maxTurn, Math.min(maxTurn, diff)));
 
     if (this.speedMode === 'own') {
-      this.assignedSpeed = scheduleSpeed(this.type, this.altitude, this.verticalPhase)
+      // in discesa anche quando segue il profilo passo passo (livello autorizzato appena sotto la quota attuale)
+      const phase = this.verticalPhase === 'cruise' && this.verticalFpm < -300 ? 'descent' : this.verticalPhase;
+      this.assignedSpeed = scheduleSpeed(this.type, this.altitude, phase)
         * this.perf.speed * (this.emergency?.perf.speed ?? 1);
     } else if (this.assignedMach) {
       this.assignedSpeed = this.assignedMach * soundSpeedKt(this.altitude);
@@ -682,10 +741,10 @@ export class Aircraft {
     if (this._slbWait > 0) this._slbWait -= dt;
     else this.slbFL = Math.round(this.assignedAltitude / 1000) * 10;
 
-    const nmPerSec = this.speed / 3600;
-    const rad = (this.heading * Math.PI) / 180;
-    this.x += Math.sin(rad) * nmPerSec * dt;
-    this.y -= Math.cos(rad) * nmPerSec * dt;
+    const v = velocityVector(this);
+    this.x += v.x * dt;
+    this.y += v.y * dt;
+    this.gsKt = Math.hypot(v.x, v.y) * 3600;   // velocità al suolo dell'ultimo passo
 
     if (this.mode === 'route' && this.route.length > 0) {
       const wp = waypoint(this.route[0]);
@@ -770,7 +829,8 @@ function radioFailureStep(ac, holdLeftS, profileFt, phase) {
 // quello precedente trattiene il volo al livello coordinato, i voli in contatto mantengono l'autorizzazione.
 export function stepGhost(g, dt) {
   // distanza lungo il piano aggiornata in modo incrementale (più rapido che ricalcolarla dalla rotta)
-  g._along = g._along === undefined ? Math.max(g.profileS ?? 0, g.alongTrackNm()) : g._along + (g.speed * dt) / 3600;
+  g._along = g._along === undefined ? Math.max(g.profileS ?? 0, g.alongTrackNm())
+    : g._along + (g.appVectors ? 0 : ((g.gsKt ?? g.speed) * dt) / 3600);
   const nearBand = g.altitude >= airspace.floorFt - 3000 && g.altitude < airspace.ceilingFt + 3000;
   // uscita dall'alto o dal basso: il controllore passa il volo all'ente successivo quando arriva all'XFL
   // (keepUntilHandoff: previsione delle zone, il volo resta nostro finché non lo si passa davvero)
@@ -804,12 +864,72 @@ export function stepGhost(g, dt) {
   } else if (g.control === 'other') {
     const ft = Math.round(profileAltitude(g.profile, g._along) / 100) * 100;
     g.assignedAltitude = g.capFt == null ? ft : Math.min(ft, g.capFt);
-  } else if (g.control === 'transferred' && g.mode === 'route') {
+  } else if (g.control === 'transferred' && (g.mode === 'route' || g.appVectors)) {
     const profileFt = Math.round(profileAltitude(g.profile, g._along) / 100) * 100;
     g.assignedAltitude = transferredAltitude(g, profileFt, profilePhase(g.profile, g._along));
   }
   applyResolution(g);
+  // vettori dell'avvicinamento a chi arriva alto: le previsioni li seguono come il volo vero
+  if (g.control === 'other' || g.control === 'transferred') approachVectors(g);
   g.update(dt);
+}
+
+// Avvicinamento (traffico non più nostro vicino alla destinazione): un arrivo ancora troppo alto per la strada che
+// gli resta scende più ripido (aerofreni); se non basta viene vettorato di lato rispetto alla rotta, dalla parte con
+// meno traffico, e rimandato diretto sul punto di finale quando è abbastanza basso. Così atterra davvero, invece di
+// sorvolare il campo a FL100 e sparire; lo stesso vale per un volo dirottato su un aeroporto vicino per
+// un'emergenza. In avvicinamento un arrivo non risale. traffic: gli altri voli (per scegliere il lato dei vettori).
+function approachVectors(ac, traffic = null) {
+  if (ac.emergency?.radio === false) return;
+  const dest = waypoint(ac.destination);
+  const d = dest ? distance(ac, dest) : Infinity;
+  if (d > APP_VECTOR_NM) {
+    ac.appVectors = false;
+    ac.appMinFt = null;
+    return;
+  }
+  // pendenza che il volo riesce a tenere (piedi per miglio), con un margine; ripida: con gli aerofreni
+  const ftPerNm = (APP_DESCENT_SHARE * ac.descentFtS * 3600) / Math.max(ac.speed, 150);
+  const steepFtPerNm = ftPerNm * DESCENT_RATE_MAX;
+  const excess = ac.altitude - APP_GATE_FT;
+  const steep = () => {
+    ac.assignedAltitude = Math.min(ac.assignedAltitude, APP_GATE_FT);
+    // un'emergenza (discesa rapida) scende già al massimo: niente aerofreni in più
+    if (!ac.emergency) ac.assignedRateFpm = ac.descentFtS * 60 * DESCENT_RATE_MAX;
+  };
+  if (ac.appVectors) {
+    steep();
+    if (excess <= ftPerNm * d) {
+      // abbastanza basso per tornare: diretto al punto di finale (ICAO/pista), poi la pista
+      ac.appVectors = false;
+      const fin = ac.route.findLastIndex((id) => id.startsWith(`${ac.destination}/`));
+      ac.route = fin >= 0 ? ac.route.slice(fin) : [ac.destination];
+      ac.mode = 'route';
+      ac.turnDirection = null;
+    }
+  } else if (ac.mode === 'route') {
+    const remaining = ac.remainingRouteNm();
+    if (excess > steepFtPerNm * remaining) {
+      // vettori di lato: a 90 gradi dalla direzione dell'aeroporto, dalla parte con meno traffico vicino
+      const toDest = bearing(ac, dest);
+      const crowd = (side) => (traffic ?? []).filter((o) => o !== ac && Math.abs(o.altitude - ac.altitude) < 5000
+        && distance(ac, o) < 20 && Math.sign(angleDiff(bearing(ac, o), toDest)) === side).length;
+      const side = crowd(1) <= crowd(-1) ? 1 : -1;
+      ac.appVectors = true;
+      ac.mode = 'heading';
+      ac.assignedHeading = normalizeDeg(toDest + side * 90);
+      ac.turnDirection = null;
+      steep();
+    } else if (excess > ftPerNm * remaining) {
+      steep();
+    }
+  }
+  if (!ac.resolution) {
+    ac.appMinFt = Math.min(ac.appMinFt ?? Infinity, Math.max(ac.altitude, ac.assignedAltitude));
+    ac.assignedAltitude = Math.min(ac.assignedAltitude, ac.appMinFt);
+  }
+  // le istruzioni di separazione degli altri enti (limiti di livello) restano valide anche durante i vettori
+  applyResolution(ac);
 }
 
 // Istruzione data da un altro ente per separare il volo (vedi _resolveOthersTick): limite superiore o inferiore
@@ -822,9 +942,11 @@ function applyResolution(ac) {
   if (r.speedKt != null) {
     // velocità indicata: l'ente che la assegna la fa mantenere anche in salita o in discesa
     ac.speedMode = 'assigned';
+    ac.speedByResolution = true;
     ac.assignedMach = null;
-    ac.assignedCas = r.speedKt;
-    ac.assignedSpeed = casToTas(r.speedKt, ac.altitude);
+    // sotto FL100 non oltre 250 kt
+    ac.assignedCas = ac.altitude < 10500 ? Math.min(r.speedKt, 250) : r.speedKt;
+    ac.assignedSpeed = casToTas(ac.assignedCas, ac.altitude);
   }
 }
 
@@ -2417,7 +2539,11 @@ export class Simulation {
     const dtc = ac._controlAt == null ? 0 : this.simTime - ac._controlAt;
     ac._controlAt = this.simTime;
     if (ac.profileS === null) ac.profileS = s;
-    else if (ac.mode === 'heading') ac.profileS += (ac.speed * dtc) / 3600;
+    // avanza con la strada percorsa (velocità al suolo), come nelle previsioni, e mai meno della posizione lungo la
+    // rotta: dopo una deviazione il volo rientra in rotta più indietro di quanto ha volato, e con la sola posizione
+    // il profilo restava fermo per minuti (volo livellato a FL251 a metà salita); fermo invece durante i vettori
+    // dell'avvicinamento, che allungano la strada apposta
+    else if (!ac.appVectors) ac.profileS += ((ac.gsKt ?? ac.speed) * dtc) / 3600;
     ac.profileS = Math.max(ac.profileS, s);
     const profileFt = Math.round(profileAltitude(ac.profile, ac.profileS) / 100) * 100;
     const phase = profilePhase(ac.profile, ac.profileS);
@@ -2427,6 +2553,7 @@ export class Simulation {
       // salita fermata dall'ente precedente per un arrivo che alla fine non è passato da noi
       if (ac.capFt != null) ac.assignedAltitude = Math.min(ac.assignedAltitude, ac.capFt);
       applyResolution(ac);
+      approachVectors(ac, this.aircraft);
     } else if (ac.control === 'inbound' || ac.control === 'offered') {
       // l'ente precedente mantiene il volo sul livello coordinato
       ac.assignedAltitude = coordinatedAltitude(profileFt, ac.clamp, ac.entryFt, ac.capFt, phase === 'climb');
@@ -2492,9 +2619,10 @@ export class Simulation {
       }
       const takeover = takeoverS(ac);
       if (elapsed > takeover) ac.assignedAltitude = transferredAltitude(ac, profileFt, phase);
-      if (elapsed > takeover + 20 && ac.mode === 'heading') ac.resumeOwnNavigation();
+      if (elapsed > takeover + 20 && ac.mode === 'heading' && !ac.appVectors) ac.resumeOwnNavigation();
       if (elapsed > takeover + 20) ac.resumeOwnSpeed();
       if (elapsed > takeover) applyResolution(ac);
+      if (elapsed > takeover) approachVectors(ac, this.aircraft);
     }
 
     if (lateral && reached) ac.wasLateral = true;
@@ -2845,7 +2973,7 @@ export class Simulation {
   _release(ac, tracks, free = null) {
     const r = ac.resolution;
     // la velocità torna quella propria, a meno che nel frattempo non l'abbia cambiata il controllore
-    if (r?.speedKt != null && ac.speedMode === 'assigned' && ac.assignedCas === r.speedKt) ac.resumeOwnSpeed();
+    if (r?.speedKt != null && ac.speedMode === 'assigned' && ac.speedByResolution) ac.resumeOwnSpeed();
     ac.resolution = null;
     tracks.set(ac, free ?? this._resolveTrack(ac, null));
   }
@@ -2933,8 +3061,9 @@ export class Simulation {
 
   _apply(m, resolution, track, tracks) {
     const old = m.resolution;
-    if (old?.speedKt != null && resolution.speedKt == null && m.speedMode === 'assigned' && m.assignedCas === old.speedKt) {
+    if (old?.speedKt != null && resolution.speedKt == null && m.speedMode === 'assigned' && m.speedByResolution) {
       m.speedMode = 'own';
+      m.speedByResolution = false;
       m.assignedCas = null;
     }
     // l'istruzione si applica a ogni passo in _updateControl (per un volo appena passato, dopo TAKEOVER_S)
@@ -2945,6 +3074,8 @@ export class Simulation {
 
   tick(dtRealSeconds) {
     if (this.paused || this.gameOver) return;
+    // il vento della sessione muove gli aerei (non nelle lezioni costruite a mano del tutorial)
+    setSessionWind(this.scripted ? null : this.weather?.wind);
     const dt = dtRealSeconds * this.timeMultiplier;
     this.simTime += dt;
 
@@ -3018,9 +3149,10 @@ export class Simulation {
       // PAL per Catania, PISIP per Pescara) e il volo appena passato all'avvicinamento spariva subito
       const nearDest = dest && distance(ac, dest) < LANDING_RADIUS_NM;
       const onFinal = ac.route.every((id) => id === ac.destination);
-      if (!OURS.has(ac.control) && nearDest && (ac.altitude < LANDING_FT || (onFinal && ac.altitude < 12000))) return false;
+      if (!OURS.has(ac.control) && nearDest && (ac.altitude < LANDING_FT || (onFinal && ac.altitude < LANDING_FINAL_FT))) return false;
       // volo dirottato per un'emergenza: l'ente successivo lo porta all'atterraggio, sparisce dal nostro radar
-      if (!OURS.has(ac.control) && ac.emergency?.divert && dest && distance(ac, dest) < 10) return false;
+      // quando è ormai basso vicino all'aeroporto (se arriva alto, l'avvicinamento lo vettora prima a scendere)
+      if (!OURS.has(ac.control) && ac.emergency?.divert && dest && distance(ac, dest) < 10 && ac.altitude < LANDING_FINAL_FT) return false;
       if (OURS.has(ac.control)) return inView(ac, 150);
       return inView(ac, 40);
     });

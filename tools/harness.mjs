@@ -24,6 +24,14 @@ const { distance } = await import(`${R}/geo.js`);
 
 const DT = 2;   // passo di simulazione (s)
 
+// Orologio della misura. La ricerca dei conflitti programmati (sim.js, traffic.js) si ferma dopo qualche
+// millisecondo di calcolo, letto con performance.now: con l'orologio vero lo stesso seme dava risultati diversi a ogni
+// esecuzione, e diversi su computer diversi. Qui l'orologio avanza di un passo fisso a ogni lettura, tarato sulla
+// ricerca vera su un Mac recente (circa 20 letture per millisecondo): la misura fa lo stesso lavoro del gioco ed è
+// ripetibile. Il tempo di calcolo per passo si misura con l'orologio vero.
+const realNow = performance.now.bind(performance);
+const CLOCK_STEP_MS = 1 / 20;
+
 function nearExit(ac) {
   const fix = ac.exitFix ? waypoint(ac.exitFix) : null;
   return fix ? distance(ac, fix) < 6 : false;
@@ -51,6 +59,16 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
     rnd = (rnd * 1664525 + 1013904223) % 4294967296;
     return rnd / 4294967296;
   };
+  let fakeMs = 0;
+  performance.now = () => (fakeMs += CLOCK_STEP_MS);
+  try {
+    return run(centreId, sectorId, hours);
+  } finally {
+    performance.now = realNow;
+  }
+}
+
+function run(centreId, sectorId, hours) {
   setCentre(centreId);
   loadSector(sectorId);
   // DIFF=facile|media|difficile per misurare un'altra difficoltà (di default quella del settore)
@@ -121,10 +139,11 @@ export function measure(centreId, sectorId, hours = 5, seed = 1) {
         sim.handOff(ac);
       }
     }
-    const t0 = performance.now();
+    const t0 = realNow();
     sim.tick(DT);
-    tickMs = Math.max(tickMs, performance.now() - t0);
-    tickSum += performance.now() - t0;
+    const elapsed = realNow() - t0;
+    tickMs = Math.max(tickMs, elapsed);
+    tickSum += elapsed;
     for (const p of sim.stca) {
       const key = [p.a.callsign, p.b.callsign].sort().join('-');
       if (!seen.has(key)) {

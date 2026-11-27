@@ -858,8 +858,10 @@ function drawTrack(ctx, t, ac, color, dim) {
   }
 
   if (ac.showVector) {
-    const len = (ac.speed / 60) * radarView.vectorMin * t.scale;
-    const rad = (ac.heading * Math.PI) / 180;
+    // vettore al suolo: rotta e velocità con il vento (i VFR non hanno vento)
+    const g = ac.groundVector ?? { track: ac.heading, gs: ac.speed };
+    const len = (g.gs / 60) * radarView.vectorMin * t.scale;
+    const rad = (g.track * Math.PI) / 180;
     ctx.globalAlpha = dim * 0.9;
     ctx.strokeStyle = color;
     ctx.lineWidth = 1.3;
@@ -929,9 +931,11 @@ const CPA_MAX_S = 1800;
 let cpaBoxes = [];
 
 export function closestApproach(a, b) {
+  // velocità al suolo (con il vento)
   const v = (ac) => {
-    const r = (ac.heading * Math.PI) / 180;
-    return { x: (Math.sin(r) * ac.speed) / 3600, y: (-Math.cos(r) * ac.speed) / 3600 };
+    const g = ac.groundVector ?? { track: ac.heading, gs: ac.speed };
+    const r = (g.track * Math.PI) / 180;
+    return { x: (Math.sin(r) * g.gs) / 3600, y: (-Math.cos(r) * g.gs) / 3600 };
   };
   const va = v(a);
   const vb = v(b);

@@ -436,7 +436,7 @@ export class LabelPanel {
       cumulative += distance(prev, wp);
       prev = wp;
       li.querySelector('.wp-dist').textContent = `${Math.round(cumulative)} nm`;
-      li.querySelector('.wp-eta').textContent = fmtDuration((cumulative / Math.max(ac.speed, 1)) * 3600);
+      li.querySelector('.wp-eta').textContent = fmtDuration((cumulative / Math.max(ac.groundVector.gs, 1)) * 3600);
     });
     // in prua assegnata le ETA sono solo indicative (l'aereo non sta seguendo la rotta)
     list.classList.toggle('stale', ac.mode === 'heading');

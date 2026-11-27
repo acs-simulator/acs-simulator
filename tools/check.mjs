@@ -148,7 +148,7 @@ check('lezioni ben formate', wellFormed, problem);
 
 // --- 4. bilanciamento della simulazione --------------------------------------
 
-section('Bilanciamento della simulazione (banco di prova, 2 ore per settore)');
+section('Bilanciamento della simulazione (banco di prova, 2 semi da 2 ore per settore)');
 const { measure } = await import(`${ROOT}/tools/harness.mjs`);
 const { DIFFICULTY } = await import(`${R}/sector-model.js`);
 const { CENTRES } = await import(`${R}/sectors.js`);
@@ -186,10 +186,20 @@ const tickLimit = TICK_LIMIT_MS * speed;
 console.log(`  velocità della macchina: ${speed.toFixed(2)}× più lenta del riferimento, soglia di calcolo ${tickLimit.toFixed(1)} ms`);
 
 const CASES = [['roma', 'NWA'], ['roma', 'OVB'], ['milano', CENTRES[1].sectors[0].id]];
+const SEEDS = [1, 2];
 for (const [centre, id] of CASES) {
   const sector = CENTRES.find((c) => c.id === centre).sectors.find((s) => s.id === id);
   const target = DIFFICULTY[sector.difficulty].load;
-  const r = measure(centre, id, 2, 7);
+  // due semi da due ore, in media: il banco di prova è ripetibile (stesso seme, stesso risultato), ma un seme solo
+  // può capitare su un'ora particolare (pochi conflitti programmabili, una perdita altrui in più)
+  const runs = SEEDS.map((seed) => measure(centre, id, 2, seed));
+  const mean = (k) => +(runs.reduce((sum, x) => sum + x[k], 0) / runs.length).toFixed(2);
+  const sum = (k) => runs.reduce((acc, x) => acc + x[k], 0);
+  const r = {
+    load: mean('load'), offersPerH: mean('offersPerH'), transitMin: mean('transitMin'), othersLostPerH: mean('othersLostPerH'),
+    tickMsAvg: mean('tickMsAvg'), plannedPerH: mean('plannedPerH'), plannedRealPerH: mean('plannedRealPerH'),
+    handoffs: sum('handoffs'), wrong: sum('wrong'), climbingArrivals: sum('climbingArrivals'),
+  };
   const line = `carico ${r.load} (atteso ~${target}) · offerte/h ${r.offersPerH} · passaggio ${r.transitMin} min`
     + ` · hand-off ${r.handoffs} · perdite altrui/h ${r.othersLostPerH} · tick ${r.tickMsAvg} ms`;
   console.log(`  ${centre} ${id}: ${line}`);

@@ -26,11 +26,11 @@
     "site": "node tools/build-site.mjs"
   },
   "devDependencies": {
-    "electron": "^32.0.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^45.5.0",
+    "electron-builder": "^26.18.0"
   },
   "allowScripts": {
-    "electron@32.3.3": true
+    "electron@45.5.0": true
   },
   "build": {
     "appId": "com.acssimulator.app",

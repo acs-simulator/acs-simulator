@@ -40,10 +40,12 @@ export function tasToCas(tas, altFt) {
 }
 
 // Velocità propria (vera) secondo il programma del tipo: velocità indicata di salita, crociera o discesa,
-// 250 kt sotto FL100, velocità ridotte vicino all'aeroporto, limite del Mach di crociera in quota.
+// 250 kt sotto FL100 (in discesa già da DECEL_FROM_FT, così il volo passa FL100 a 250 kt e non rallenta dopo),
+// velocità ridotte vicino all'aeroporto, limite del Mach di crociera in quota.
+const DECEL_FROM_FT = 13000;
 export function scheduleSpeed(type, altFt, phase = 'cruise') {
   let cas = phase === 'climb' ? type.climbCas : phase === 'descent' ? type.descentCas : type.cruiseCas;
-  if (altFt < 10000) cas = Math.min(cas, 250);
+  if (altFt < 10000 || (phase === 'descent' && altFt < DECEL_FROM_FT)) cas = Math.min(cas, 250);
   if (altFt < 5000) cas = Math.min(cas, phase === 'descent' ? 210 : 220);
   return Math.min(casToTas(cas, altFt), type.mach * soundSpeedKt(altFt));
 }
